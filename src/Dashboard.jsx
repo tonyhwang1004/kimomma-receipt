@@ -187,12 +187,28 @@ export default function App() {
   const processData = useCallback((owb, w8, w7, rcpts) => {
     if (!owb || !w8 || !w7) return;
     const online = parseOnline(owb);
-    const sheet8 = w8.SheetNames.find(n => n.includes("8층결제")) || w8.SheetNames[0];
-    const sheet7 = w7.SheetNames.find(n => n.includes("7층결제")) || w7.SheetNames[0];
+    const sheet8 = w8.SheetNames[0];
+    const sheet7 = w7.SheetNames[0];
     const off8 = parseOffline(w8, sheet8, "8층");
     const off7 = parseOffline(w7, sheet7, "7층");
     const allOff = [...off8, ...off7];
 
+    // ── 결제선생 기준 미납 파악 (이름 + 전화번호 끝 4자리)
+    const paidSet = new Set(online.map(o => `${o.이름}_${o.전화.slice(-4)}`));
+
+    const checkPaid = (s) => {
+      return paidSet.has(`${s.이름}_${s.학생전화.slice(-4)}`) ||
+             paidSet.has(`${s.이름}_${s.학부모전화.slice(-4)}`);
+    };
+
+    const off8WithPaid = off8.map(s => ({ ...s, 납부여부: checkPaid(s) }));
+    const off7WithPaid = off7.map(s => ({ ...s, 납부여부: checkPaid(s) }));
+    const allOffWithPaid = [...off8WithPaid, ...off7WithPaid];
+
+    const unpaid8 = off8WithPaid.filter(s => !s.납부여부);
+    const unpaid7 = off7WithPaid.filter(s => !s.납부여부);
+
+    // 온라인 미매칭 (명단에 없는 결제선생 건)
     const matchedOnlineIds = new Set();
     allOff.forEach((s) => {
       const match = online.find((o) => o.이름 === s.이름 && (o.전화.slice(-4) === s.학생전화.slice(-4) || o.전화.slice(-4) === s.학부모전화.slice(-4)));
@@ -205,19 +221,21 @@ export default function App() {
     const receiptTotal = (rcpts || []).reduce((s, r) => s + Number(r.amount || 0), 0);
     const totalPaid = onlinePaid + receiptTotal;
 
-    // 참고용 (집계 합계에 포함 안 함)
-    const off8Paid = off8.filter(s => !s.미납).reduce((s, o) => s + o.실결제금액, 0);
-    const off7Paid = off7.filter(s => !s.미납).reduce((s, o) => s + o.실결제금액, 0);
-    const unpaid8 = off8.filter(s => s.미납);
-    const unpaid7 = off7.filter(s => s.미납);
-    const unpaidAmt = [...unpaid8, ...unpaid7].reduce((s, o) => s + o.결제금액, 0);
+    // 참고용
+    const off8Paid = off8WithPaid.filter(s => s.납부여부).reduce((s, o) => s + (o.실결제금액||0), 0);
+    const off7Paid = off7WithPaid.filter(s => s.납부여부).reduce((s, o) => s + (o.실결제금액||0), 0);
 
     const discountStats = {};
-    allOff.forEach((s) => { if (s.할인정보) discountStats[s.할인정보] = (discountStats[s.할인정보] || 0) + 1; });
+    allOffWithPaid.forEach((s) => { if (s.할인정보) discountStats[s.할인정보] = (discountStats[s.할인정보] || 0) + 1; });
 
     setData({
-      online, allOff, off8, off7, unmatchedOnline,
-      stats: { onlinePaid, off8Paid, off7Paid, receiptTotal, total: totalPaid, unpaidCnt: unpaid8.length + unpaid7.length, unpaidAmt, students8: off8.length, students7: off7.length },
+      online, allOff: allOffWithPaid, off8: off8WithPaid, off7: off7WithPaid, unmatchedOnline,
+      stats: {
+        onlinePaid, off8Paid, off7Paid, receiptTotal, total: totalPaid,
+        unpaidCnt: unpaid8.length + unpaid7.length,
+        unpaidAmt: 0,
+        students8: off8.length, students7: off7.length,
+      },
       discountStats,
     });
     setTab("summary");
@@ -229,7 +247,7 @@ export default function App() {
 
   const filteredStudents = data?.allOff.filter((s) => {
     if (floorFilter !== "전체" && s.층 !== floorFilter) return false;
-    if (unpaidOnly && !s.미납) return false;
+    if (unpaidOnly && s.납부여부) return false;
     if (search && !s.이름.includes(search) && !s.학교.includes(search)) return false;
     return true;
   }) || [];
@@ -254,8 +272,8 @@ export default function App() {
             <div style={{ fontSize: 14, fontWeight: 600, color: C.textSub, marginBottom: 20 }}>📂 파일 3개를 업로드하면 자동으로 통합됩니다</div>
             <div style={{ display: "grid", gap: 12 }}>
               <DropZone label="온라인 결제 (결제선생 xlsx)" icon="🌐" onFile={handleOnline} loaded={!!onlineWb} />
-              <DropZone label="8층 결제표 xlsx" icon="8️⃣" onFile={handle8} loaded={!!wb8} />
-              <DropZone label="7층 결제표 xlsx" icon="7️⃣" onFile={handle7} loaded={!!wb7} />
+              <DropZone label="8층 전체 학생 명단 xlsx" icon="8️⃣" onFile={handle8} loaded={!!wb8} />
+              <DropZone label="7층 전체 학생 명단 xlsx" icon="7️⃣" onFile={handle7} loaded={!!wb7} />
             </div>
           </div>
           <p style={{ textAlign: "center", color: C.textMuted, fontSize: 12, marginTop: 20 }}>영수증 앱 데이터는 Supabase에서 자동으로 불러옵니다</p>
@@ -395,7 +413,7 @@ export default function App() {
                 <div style={{ color: C.textSub, fontSize: 12 }}>{s.좌석유형}</div>
                 <div style={{ color: C.textSub, fontSize: 12 }}>{s.결제일}</div>
                 <div style={{ fontWeight: 600 }}>{money(s.결제금액)}</div>
-                <div style={{ fontWeight: 700, color: s.미납 ? C.danger : C.success }}>{s.미납 ? "⚠️ 미납" : money(s.실결제금액)}</div>
+                <div style={{ fontWeight: 700, color: !s.납부여부 ? C.danger : C.success }}>{!s.납부여부 ? "⚠️ 미납" : "✅ 납부"}</div>
                 <div><Badge color={s.결제방식 === "카드" ? C.blue : s.결제방식 === "현금" ? C.success : C.danger}>{s.결제방식 || "-"}</Badge></div>
                 <div style={{ fontSize: 11, color: C.warning }}>{s.할인정보}</div>
               </div>
@@ -409,11 +427,11 @@ export default function App() {
             <div style={{ background: C.dangerBg, borderRadius: 14, padding: "16px 20px", border: `1px solid ${C.danger}44`, marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ fontWeight: 700, color: C.danger, fontSize: 15 }}>⚠️ 미납 학생 현황</div>
-                <div style={{ fontSize: 13, color: C.textSub, marginTop: 4 }}>총 {data.stats.unpaidCnt}명 · 미수금 {money(data.stats.unpaidAmt)}</div>
+                <div style={{ fontSize: 13, color: C.textSub, marginTop: 4 }}>총 {data.stats.unpaidCnt}명 · 결제선생 미매칭 기준</div>
               </div>
             </div>
             {["8층", "7층"].map((floor) => {
-              const unpaidList = (floor === "8층" ? data.off8 : data.off7).filter(s => s.미납);
+              const unpaidList = (floor === "8층" ? data.off8 : data.off7).filter(s => !s.납부여부);
               if (unpaidList.length === 0) return null;
               return (
                 <div key={floor} style={{ marginBottom: 24 }}>
