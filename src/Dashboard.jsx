@@ -218,6 +218,7 @@ export default function App() {
   const sheet7Ref = useRef(null);
   const receiptsRef = useRef([]);
   const scholarSetRef = useRef(new Set());
+  const [scholarCount, setScholarCount] = useState(0);
 
   // ── 구글시트 자동 로드 (명단 + 결제표 장학생 정보)
   useEffect(() => {
@@ -254,6 +255,7 @@ export default function App() {
       });
       console.log("총 장학생:", [...scholars]);
       scholarSetRef.current = scholars;
+      setScholarCount(scholars.size);
       setSheetLoading(false);
     }).catch(e => {
       setSheetError("구글시트 로드 실패: " + e.message);
@@ -414,8 +416,13 @@ export default function App() {
             {sheetLoading && <div style={{ fontSize: 13, color: C.primary, marginBottom: 16 }}>⟳ 학생 명단 자동 로드 중...</div>}
             {sheetError && <div style={{ fontSize: 13, color: C.danger, marginBottom: 16 }}>⚠️ {sheetError}</div>}
             {!sheetLoading && !sheetError && (
-              <div style={{ fontSize: 13, color: C.success, marginBottom: 16 }}>
+              <div style={{ fontSize: 13, color: C.success, marginBottom: 4 }}>
                 ✅ 학생 명단 자동 로드 완료 (8층 {sheet8Rows?.filter(r=>r[0]&&r[0].trim()&&r[0].trim()!=='학생이름').length-1 || 0}명 · 7층 {sheet7Rows?.filter(r=>r[0]&&r[0].trim()&&r[0].trim()!=='학생이름').length-1 || 0}명)
+              </div>
+            )}
+            {!sheetLoading && scholarCount > 0 && (
+              <div style={{ fontSize: 13, color: "#f59e0b", marginBottom: 16 }}>
+                🎓 장학생 {scholarCount}명 자동 로드 완료
               </div>
             )}
             <div style={{ display: "grid", gap: 12 }}>
