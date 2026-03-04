@@ -295,33 +295,16 @@ export default function App() {
 
     // ── 납부여부 체크: 결제선생 OR 영수증앱
     const checkPaid = (s) => {
-      const normalName = normalizeName(s.이름);   // 예: 김나현4
-      const baseName = baseNameOnly(s.이름);       // 예: 김나현
-      const phone4_s = s.학생전화?.slice(-4);
-      const phone4_p = s.학부모전화?.slice(-4);
-      const hasPhone = (phone4_s && phone4_s.length === 4) || (phone4_p && phone4_p.length === 4);
+      const normalName = normalizeName(s.이름);  // 예: 김나현4
+      const baseName = baseNameOnly(s.이름);      // 예: 김나현
 
-      // 1순위: 이름(정규화) + 전화번호 끝4자리 매칭
-      const onlinePhoneMatch = hasPhone && (
-        (phone4_s && phone4_s.length === 4 && (
-          onlinePaidSet.has(`${normalName}_${phone4_s}`) ||
-          onlinePaidSet.has(`${baseName}_${phone4_s}`)
-        )) ||
-        (phone4_p && phone4_p.length === 4 && (
-          onlinePaidSet.has(`${normalName}_${phone4_p}`) ||
-          onlinePaidSet.has(`${baseName}_${phone4_p}`)
-        ))
-      );
+      // 이름으로 매칭 (동명이인은 숫자로 구분되어 있음)
+      const onlineMatch = onlineNameSet.has(normalName) || onlineNameSet.has(baseName);
 
-      // 2순위: 전화번호 없으면 이름만으로 매칭
-      const onlineNameMatch = !hasPhone && (
-        onlineNameSet.has(normalName) || onlineNameSet.has(baseName)
-      );
-
-      // 3순위: 영수증앱 이름 매칭
+      // 영수증앱 이름 매칭
       const receiptMatch = receiptPaidSet.has(normalName) || receiptPaidSet.has(baseName) || receiptPaidSet.has(s.이름);
 
-      return onlinePhoneMatch || onlineNameMatch || receiptMatch;
+      return onlineMatch || receiptMatch;
     };
 
     const off8WithPaid = off8.map(s => ({ ...s, 납부여부: checkPaid(s) }));
@@ -330,18 +313,16 @@ export default function App() {
     const unpaid8 = off8WithPaid.filter(s => !s.납부여부);
     const unpaid7 = off7WithPaid.filter(s => !s.납부여부);
 
-    // ── 온라인 미매칭 (명단에 없는 결제선생 건)
-    const matchedOnlineIds = new Set();
-    allOff.forEach((s) => {
-      const match = online.find((o) =>
-        o.이름 === s.이름 &&
-        o.전화?.length >= 4 &&
-        (o.전화.slice(-4) === s.학생전화?.slice(-4) ||
-         o.전화.slice(-4) === s.학부모전화?.slice(-4))
-      );
-      if (match) matchedOnlineIds.add(match.승인번호);
+    // ── 온라인 미매칭 (명단에 없는 결제선생 건) - 이름으로만 비교
+    const allOffNameSet = new Set([
+      ...allOff.map(s => normalizeName(s.이름)),
+      ...allOff.map(s => baseNameOnly(s.이름)),
+    ]);
+    const unmatchedOnline = online.filter((o) => {
+      const norm = normalizeName(o.이름);
+      const base = baseNameOnly(o.이름);
+      return !allOffNameSet.has(norm) && !allOffNameSet.has(base);
     });
-    const unmatchedOnline = online.filter((o) => !matchedOnlineIds.has(o.승인번호));
 
     // ── 정확한 수납 합계
     const onlinePaid = online.reduce((s, o) => s + o.금액, 0);
