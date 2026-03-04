@@ -59,14 +59,27 @@ const normalizePhone = (val) => {
   return s;
 };
 
-// 이름 정규화: 숫자/영문 suffix 제거 (김나현4 → 김나현, 김민서 N → 김민서)
+// 이름 정규화: 한글+숫자 조합 이름 추출
+// 김나현4→김나현4(동명이인구분), 심예나 예비고2→심예나, 이시우 고1→이시우, 김엄마 이유담→이유담
 const normalizeName = (name) => {
   if (!name) return "";
-  return String(name).trim()
-    .replace(/^"|"$/g, '')
-    .replace(/\s*[A-Za-z0-9]+$/, '')  // 끝에 붙은 영문/숫자 제거
-    .trim();
+  const cleaned = String(name).trim().replace(/^"|"$/g, '');
+  // 한글+숫자로만 구성된 첫 토큰 추출 (공백 전까지)
+  // 단, 뒤에 오는 게 순수 한글(예비고, 고, 예비 등)이면 무시
+  const tokens = cleaned.split(/\s+/);
+  // 첫 토큰이 한글로 시작하면 사용
+  for (const token of tokens) {
+    if (/^[가-힣]+[0-9]*$/.test(token)) {
+      return token; // 한글(+숫자) 토큰
+    }
+  }
+  // 못 찾으면 한글만 추출
+  const match = cleaned.match(/[가-힣]+[0-9]*/);
+  return match ? match[0] : cleaned;
 };
+
+// 이름에서 숫자 제거 (동명이인 매칭용: 김나현4 → 김나현)
+const baseNameOnly = (name) => normalizeName(name).replace(/[0-9]+$/, '');
 
 const parseDiscount = (text) => {
   if (!text || String(text).trim() === "") return "";
@@ -272,22 +285,43 @@ export default function App() {
         .map(o => `${normalizeName(o.이름)}_${o.전화.slice(-4)}`)
     );
     // 이름만으로도 매칭 (전화번호 없는 경우 대비)
-    const onlineNameSet = new Set(online.map(o => normalizeName(o.이름)));
+    const onlineNameSet = new Set([
+      ...online.map(o => normalizeName(o.이름)),
+      ...online.map(o => baseNameOnly(o.이름)),
+    ]);
 
     // ── 영수증앱 납부 세트 (이름 기준)
     const receiptPaidSet = new Set(receipts.map(r => r.name?.trim()));
 
     // ── 납부여부 체크: 결제선생 OR 영수증앱
     const checkPaid = (s) => {
-      const normalName = normalizeName(s.이름);
-      const phone4_student = s.학생전화?.slice(-4);
-      const phone4_parent = s.학부모전화?.slice(-4);
-      // 전화번호 끝4자리 + 이름으로 매칭
-      const onlineMatch = (phone4_student && phone4_student.length === 4 && onlinePaidSet.has(`${normalName}_${phone4_student}`)) ||
-                          (phone4_parent && phone4_parent.length === 4 && onlinePaidSet.has(`${normalName}_${phone4_parent}`));
-      // 영수증앱은 이름으로 매칭
-      const receiptMatch = receiptPaidSet.has(s.이름) || receiptPaidSet.has(normalName);
-      return onlineMatch || receiptMatch;
+      const normalName = normalizeName(s.이름);   // 예: 김나현4
+      const baseName = baseNameOnly(s.이름);       // 예: 김나현
+      const phone4_s = s.학생전화?.slice(-4);
+      const phone4_p = s.학부모전화?.slice(-4);
+      const hasPhone = (phone4_s && phone4_s.length === 4) || (phone4_p && phone4_p.length === 4);
+
+      // 1순위: 이름(정규화) + 전화번호 끝4자리 매칭
+      const onlinePhoneMatch = hasPhone && (
+        (phone4_s && phone4_s.length === 4 && (
+          onlinePaidSet.has(`${normalName}_${phone4_s}`) ||
+          onlinePaidSet.has(`${baseName}_${phone4_s}`)
+        )) ||
+        (phone4_p && phone4_p.length === 4 && (
+          onlinePaidSet.has(`${normalName}_${phone4_p}`) ||
+          onlinePaidSet.has(`${baseName}_${phone4_p}`)
+        ))
+      );
+
+      // 2순위: 전화번호 없으면 이름만으로 매칭
+      const onlineNameMatch = !hasPhone && (
+        onlineNameSet.has(normalName) || onlineNameSet.has(baseName)
+      );
+
+      // 3순위: 영수증앱 이름 매칭
+      const receiptMatch = receiptPaidSet.has(normalName) || receiptPaidSet.has(baseName) || receiptPaidSet.has(s.이름);
+
+      return onlinePhoneMatch || onlineNameMatch || receiptMatch;
     };
 
     const off8WithPaid = off8.map(s => ({ ...s, 납부여부: checkPaid(s) }));
