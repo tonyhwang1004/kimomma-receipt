@@ -200,20 +200,24 @@ export default function App() {
     });
     const unmatchedOnline = online.filter((o) => !matchedOnlineIds.has(o.승인번호));
 
+    // ✅ 정확한 수납 = 결제선생 + 영수증앱만
     const onlinePaid = online.reduce((s, o) => s + o.금액, 0);
+    const receiptTotal = (rcpts || []).reduce((s, r) => s + Number(r.amount || 0), 0);
+    const totalPaid = onlinePaid + receiptTotal;
+
+    // 참고용 (집계 합계에 포함 안 함)
     const off8Paid = off8.filter(s => !s.미납).reduce((s, o) => s + o.실결제금액, 0);
     const off7Paid = off7.filter(s => !s.미납).reduce((s, o) => s + o.실결제금액, 0);
     const unpaid8 = off8.filter(s => s.미납);
     const unpaid7 = off7.filter(s => s.미납);
     const unpaidAmt = [...unpaid8, ...unpaid7].reduce((s, o) => s + o.결제금액, 0);
-    const receiptTotal = (rcpts || []).reduce((s, r) => s + Number(r.amount || 0), 0);
 
     const discountStats = {};
     allOff.forEach((s) => { if (s.할인정보) discountStats[s.할인정보] = (discountStats[s.할인정보] || 0) + 1; });
 
     setData({
       online, allOff, off8, off7, unmatchedOnline,
-      stats: { onlinePaid, off8Paid, off7Paid, receiptTotal, total: onlinePaid + off8Paid + off7Paid + receiptTotal, unpaidCnt: unpaid8.length + unpaid7.length, unpaidAmt, students8: off8.length, students7: off7.length },
+      stats: { onlinePaid, off8Paid, off7Paid, receiptTotal, total: totalPaid, unpaidCnt: unpaid8.length + unpaid7.length, unpaidAmt, students8: off8.length, students7: off7.length },
       discountStats,
     });
     setTab("summary");
@@ -294,13 +298,33 @@ export default function App() {
         {/* 집계 */}
         {tab === "summary" && (
           <div>
+            {/* 정확한 수납 집계 */}
+            <div style={{ background: C.surface, borderRadius: 16, padding: "16px 20px", border: `2px solid ${C.primary}`, marginBottom: 20 }}>
+              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>✅ 정확한 전체 수납 합계 (결제선생 + 영수증앱)</div>
+              <div style={{ fontSize: 32, fontWeight: 800, color: C.primary, letterSpacing: -1 }}>{money(data.stats.total)}</div>
+            </div>
+
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 28 }}>
-              <StatCard icon="💰" label="전체 수납 합계" value={money(data.stats.total)} sub="온라인 + 오프라인 + 영수증앱" color={C.primary} glow />
-              <StatCard icon="🌐" label="온라인 (결제선생)" value={money(data.stats.onlinePaid)} sub={`${data.online.length}건`} color={C.blue} />
-              <StatCard icon="8️⃣" label="8층 수납" value={money(data.stats.off8Paid)} sub={`${data.off8.filter(s=>!s.미납).length}명`} color={C.purple} />
-              <StatCard icon="7️⃣" label="7층 수납" value={money(data.stats.off7Paid)} sub={`${data.off7.filter(s=>!s.미납).length}명`} color="#2E9E5B" />
-              <StatCard icon="📱" label="영수증 앱 (현장)" value={money(receiptTotal)} sub={`${receipts.length}건 · 어느 기기나 합산`} color={C.warning} />
-              <StatCard icon="⚠️" label="미납" value={`${data.stats.unpaidCnt}명`} sub={money(data.stats.unpaidAmt)} color={C.danger} />
+              <StatCard icon="💳" label="결제선생 (온라인)" value={money(data.stats.onlinePaid)} sub={`${data.online.length}건 · 카드/간편결제`} color={C.blue} glow />
+              <StatCard icon="🧾" label="영수증앱 (오프라인)" value={money(data.stats.receiptTotal)} sub={`${receipts.length}건 · 현장 현금 등`} color={C.warning} glow />
+              <StatCard icon="⚠️" label="미납 학생" value={`${data.stats.unpaidCnt}명`} sub={`추정 미수금 ${money(data.stats.unpaidAmt)}`} color={C.danger} />
+            </div>
+
+            {/* 7/8층 참고용 */}
+            <div style={{ background: C.surfaceHigh, borderRadius: 14, padding: "14px 20px", border: `1px solid ${C.border}`, marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 12 }}>📋 7층/8층 결제표 참고용 (집계 합계에 미포함)</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ background: C.surface, borderRadius: 10, padding: "12px 16px", border: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>8️⃣ 8층 기록상 수납액</div>
+                  <div style={{ fontWeight: 700, color: C.blue }}>{money(data.stats.off8Paid)}</div>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>{data.off8.filter(s=>!s.미납).length}명 납부 · {data.off8.filter(s=>s.미납).length}명 미납</div>
+                </div>
+                <div style={{ background: C.surface, borderRadius: 10, padding: "12px 16px", border: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>7️⃣ 7층 기록상 수납액</div>
+                  <div style={{ fontWeight: 700, color: C.purple }}>{money(data.stats.off7Paid)}</div>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>{data.off7.filter(s=>!s.미납).length}명 납부 · {data.off7.filter(s=>s.미납).length}명 미납</div>
+                </div>
+              </div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 28 }}>
