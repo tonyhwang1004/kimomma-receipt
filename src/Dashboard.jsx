@@ -65,7 +65,7 @@ function parseOnline(wb) {
 function parseOffline(wb, sheetName, floor) {
   const ws = wb.Sheets[sheetName];
   if (!ws) return [];
-  const raw = XLSX.utils.sheet_to_array(ws, { defval: "" });
+  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
   const results = [];
   for (let i = 1; i < raw.length; i++) {
     const r = raw[i];
