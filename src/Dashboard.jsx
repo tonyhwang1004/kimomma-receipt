@@ -217,18 +217,35 @@ export default function App() {
   const sheet8Ref = useRef(null);
   const sheet7Ref = useRef(null);
   const receiptsRef = useRef([]);
+  const scholarSetRef = useRef(new Set());
 
-  // ── 구글시트 자동 로드
+  // ── 구글시트 자동 로드 (명단 + 결제표 장학생 정보)
   useEffect(() => {
     setSheetLoading(true);
     Promise.all([
       fetchSheet("8층전체학생명단"),
       fetchSheet("7층전체학생명단"),
-    ]).then(([rows8, rows7]) => {
+      fetchSheet("3월8층결제표"),
+      fetchSheet("3월7층결제표"),
+    ]).then(([rows8, rows7, pay8, pay7]) => {
       setSheet8Rows(rows8);
       setSheet7Rows(rows7);
       sheet8Ref.current = rows8;
       sheet7Ref.current = rows7;
+      // 장학생 이름 추출 (8층 M열, 7층 M/N열)
+      const scholars = new Set();
+      pay8?.slice(1).forEach(r => {
+        const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
+        const m = String(r[12] || "").trim().replace(/^"|"$/g, '');
+        if (name && m.includes("장학생")) scholars.add(normalizeName(name));
+      });
+      pay7?.slice(1).forEach(r => {
+        const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
+        const m = String(r[12] || "").trim().replace(/^"|"$/g, '');
+        const n = String(r[13] || "").trim().replace(/^"|"$/g, '');
+        if (name && (m.includes("장학생") || n.includes("장학생"))) scholars.add(normalizeName(name));
+      });
+      scholarSetRef.current = scholars;
       setSheetLoading(false);
     }).catch(e => {
       setSheetError("구글시트 로드 실패: " + e.message);
@@ -293,12 +310,18 @@ export default function App() {
     // ── 영수증앱 납부 세트 (이름 기준)
     const receiptPaidSet = new Set(receipts.map(r => r.name?.trim()));
 
-    // ── 납부여부 체크: 결제선생 OR 영수증앱
-    const checkPaid = (s) => {
-      const normalName = normalizeName(s.이름);  // 예: 김나현4
-      const baseName = baseNameOnly(s.이름);      // 예: 김나현
+    // 장학생 세트
+    const scholarSet = scholarSetRef.current;
 
-      // 이름으로 매칭 (동명이인은 숫자로 구분되어 있음)
+    // ── 납부여부 체크: 결제선생 OR 영수증앱 OR 장학생
+    const checkPaid = (s) => {
+      const normalName = normalizeName(s.이름);
+      const baseName = baseNameOnly(s.이름);
+
+      // 장학생은 현금결제 → 무조건 납부
+      if (scholarSet.has(normalName) || scholarSet.has(baseName)) return true;
+
+      // 결제선생 이름 매칭
       const onlineMatch = onlineNameSet.has(normalName) || onlineNameSet.has(baseName);
 
       // 영수증앱 이름 매칭
@@ -528,7 +551,9 @@ export default function App() {
                 <div style={{ color: C.textSub, fontSize: 12 }}>{s.좌석유형}</div>
                 <div style={{ color: C.textSub, fontSize: 12 }}>{s.결제일}</div>
                 <div style={{ fontWeight: 600 }}>{money(s.결제금액)}</div>
-                <div style={{ fontWeight: 700, color: !s.납부여부 ? C.danger : C.success }}>{!s.납부여부 ? "⚠️ 미납" : "✅ 납부"}</div>
+                <div style={{ fontWeight: 700, color: !s.납부여부 ? C.danger : C.success }}>
+                  {!s.납부여부 ? "⚠️ 미납" : scholarSetRef.current.has(normalizeName(s.이름)) ? "🎓 장학생" : "✅ 납부"}
+                </div>
                 <div><Badge color={s.결제방식 === "카드" ? C.blue : s.결제방식 === "현금" ? C.success : C.danger}>{s.결제방식 || "-"}</Badge></div>
                 <div style={{ fontSize: 11, color: C.warning }}>{s.할인정보}</div>
               </div>
@@ -553,7 +578,10 @@ export default function App() {
                   <div style={{ marginBottom: 10 }}><Badge color={floor === "8층" ? C.blue : C.purple}>{floor}</Badge><span style={{ marginLeft: 8, fontSize: 13, color: C.textSub }}>{unpaidList.length}명</span></div>
                   {unpaidList.map((s, i) => (
                     <div key={i} style={{ background: C.dangerBg, borderRadius: 12, padding: "14px 18px", border: `1px solid ${C.danger}33`, marginBottom: 8, display: "grid", gridTemplateColumns: "1fr 80px 100px 120px 140px", gap: 12, alignItems: "center" }}>
-                      <div><div style={{ fontWeight: 700 }}>{s.이름}</div><div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{s.학교} · {s.좌석유형} {s.자리}번</div></div>
+                      <div>
+                        <div style={{ fontWeight: 700 }}>{s.이름} {scholarSetRef.current.has(normalizeName(s.이름)) && <span style={{ fontSize: 11, color: C.warning, fontWeight: 700 }}>🎓 장학생</span>}</div>
+                        <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{s.학교} · {s.좌석유형} {s.자리}번</div>
+                      </div>
                       <Badge color={floor === "8층" ? C.blue : C.purple}>{floor}</Badge>
                       <div style={{ fontSize: 13, color: C.textSub }}>{s.결제일}</div>
                       <div style={{ fontWeight: 700, color: C.danger }}>{money(s.결제금액)}</div>
@@ -632,7 +660,7 @@ export default function App() {
         {tab === "online" && (
           <div>
             <div style={{ background: C.surfaceHigh, borderRadius: 14, padding: "16px 20px", border: `1px solid ${C.border}`, marginBottom: 20, fontSize: 13, color: C.textSub }}>
-              온라인 결제는 됐지만 7층/8층 시트에 이름이 없는 건입니다. 확인 후 오프라인 시트에 추가해 주세요.
+              결제는 완료됐으나 현재 명단에 없는 학생입니다. (퇴원생 또는 결제선생 입력 오류)
             </div>
             {data.unmatchedOnline.map((o, i) => (
               <div key={i} style={{ background: C.surface, borderRadius: 12, padding: "14px 18px", border: `1px solid ${C.border}`, marginBottom: 8, display: "grid", gridTemplateColumns: "1fr 120px 120px 100px 120px", gap: 12, alignItems: "center", fontSize: 13 }}>
