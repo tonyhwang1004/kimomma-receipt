@@ -8,7 +8,8 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const SHEET_ID = "1OVEffnCRTZ1A-cVCb4CYiYe3MicyI9TSkJNsau4mGVo";
 const fetchSheet = async (sheetName) => {
   const encodedName = encodeURIComponent(sheetName);
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodedName}`;
+  // range를 크게 잡아서 빈 행 포함 전체 데이터 강제 로드
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodedName}&range=A1:Z300`;
   const res = await fetch(url, { mode: "cors" });
   if (!res.ok) throw new Error("구글시트 로드 실패 (" + res.status + ")");
   const text = await res.text();
@@ -17,10 +18,10 @@ const fetchSheet = async (sheetName) => {
     let cur = "", inQ = false;
     for (let i = 0; i < r.length; i++) {
       if (r[i] === '"') { inQ = !inQ; }
-      else if (r[i] === ',' && !inQ) { cells.push(cur.trim()); cur = ""; }
+      else if (r[i] === ',' && !inQ) { cells.push(cur.trim().replace(/^"|"$/g, '')); cur = ""; }
       else { cur += r[i]; }
     }
-    cells.push(cur.trim());
+    cells.push(cur.trim().replace(/^"|"$/g, ''));
     return cells;
   });
   return rows;
@@ -53,9 +54,18 @@ const money = (n) => {
 
 const normalizePhone = (val) => {
   if (!val) return "";
-  const s = String(val).replace(/\D/g, "");
+  const s = String(val).replace(/[^0-9]/g, "");
   if (s.length === 10 && s.startsWith("1")) return "0" + s;
   return s;
+};
+
+// 이름 정규화: 숫자/영문 suffix 제거 (김나현4 → 김나현, 김민서 N → 김민서)
+const normalizeName = (name) => {
+  if (!name) return "";
+  return String(name).trim()
+    .replace(/^"|"$/g, '')
+    .replace(/\s*[A-Za-z0-9]+$/, '')  // 끝에 붙은 영문/숫자 제거
+    .trim();
 };
 
 const parseDiscount = (text) => {
@@ -74,7 +84,7 @@ function parseOnline(wb) {
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
   return rows.filter((r) => r["결제상태"] === "결제").map((r) => ({
-    이름: String(r["이름"] || "").trim(),
+    이름: normalizeName(r["이름"]),
     전화: normalizePhone(r["휴대전화번호"]),
     금액: Number(r["금액(원)"] || 0),
     결제일: String(r["결제일시"] || "").slice(0, 10),
@@ -230,8 +240,12 @@ export default function App() {
   // 구글시트 rows → 학생 목록 파싱
   const parseSheetRows = useCallback((rows, floor) => {
     if (!rows) return [];
+    // 빈 행 무시하고 이름 있는 행만 파싱 (중간 빈 행도 건너뜀)
     return rows
-      .filter(r => r[0] && String(r[0]).trim() !== "" && String(r[0]).trim() !== "학생이름" && String(r[0]).trim() !== "이름" && String(r[0]).trim() !== "-")
+      .filter(r => {
+        const name = String(r[0] || "").trim();
+        return name !== "" && name !== "학생이름" && name !== "이름" && name !== "-";
+      })
       .map(r => ({
         이름: String(r[0] || "").trim(),
         학생전화: normalizePhone(r[1]),
@@ -249,51 +263,70 @@ export default function App() {
     const off8 = parseSheetRows(rows8, "8층");
     const off7 = parseSheetRows(rows7, "7층");
     const allOff = [...off8, ...off7];
+    const receipts = rcpts || [];
 
-    // ── 결제선생 기준 미납 파악 (이름 + 전화번호 끝 4자리)
-    const paidSet = new Set(online.map(o => `${o.이름}_${o.전화.slice(-4)}`));
+    // ── 결제선생 납부 세트 (정규화된이름_전화끝4자리)
+    const onlinePaidSet = new Set(
+      online
+        .filter(o => o.전화 && o.전화.length >= 4)
+        .map(o => `${normalizeName(o.이름)}_${o.전화.slice(-4)}`)
+    );
+    // 이름만으로도 매칭 (전화번호 없는 경우 대비)
+    const onlineNameSet = new Set(online.map(o => normalizeName(o.이름)));
 
+    // ── 영수증앱 납부 세트 (이름 기준)
+    const receiptPaidSet = new Set(receipts.map(r => r.name?.trim()));
+
+    // ── 납부여부 체크: 결제선생 OR 영수증앱
     const checkPaid = (s) => {
-      return paidSet.has(`${s.이름}_${s.학생전화.slice(-4)}`) ||
-             paidSet.has(`${s.이름}_${s.학부모전화.slice(-4)}`);
+      const normalName = normalizeName(s.이름);
+      const phone4_student = s.학생전화?.slice(-4);
+      const phone4_parent = s.학부모전화?.slice(-4);
+      // 전화번호 끝4자리 + 이름으로 매칭
+      const onlineMatch = (phone4_student && phone4_student.length === 4 && onlinePaidSet.has(`${normalName}_${phone4_student}`)) ||
+                          (phone4_parent && phone4_parent.length === 4 && onlinePaidSet.has(`${normalName}_${phone4_parent}`));
+      // 영수증앱은 이름으로 매칭
+      const receiptMatch = receiptPaidSet.has(s.이름) || receiptPaidSet.has(normalName);
+      return onlineMatch || receiptMatch;
     };
 
     const off8WithPaid = off8.map(s => ({ ...s, 납부여부: checkPaid(s) }));
     const off7WithPaid = off7.map(s => ({ ...s, 납부여부: checkPaid(s) }));
-    const allOffWithPaid = [...off8WithPaid, ...off7WithPaid];
 
     const unpaid8 = off8WithPaid.filter(s => !s.납부여부);
     const unpaid7 = off7WithPaid.filter(s => !s.납부여부);
 
-    // 온라인 미매칭 (명단에 없는 결제선생 건)
+    // ── 온라인 미매칭 (명단에 없는 결제선생 건)
     const matchedOnlineIds = new Set();
     allOff.forEach((s) => {
-      const match = online.find((o) => o.이름 === s.이름 && (o.전화.slice(-4) === s.학생전화.slice(-4) || o.전화.slice(-4) === s.학부모전화.slice(-4)));
+      const match = online.find((o) =>
+        o.이름 === s.이름 &&
+        o.전화?.length >= 4 &&
+        (o.전화.slice(-4) === s.학생전화?.slice(-4) ||
+         o.전화.slice(-4) === s.학부모전화?.slice(-4))
+      );
       if (match) matchedOnlineIds.add(match.승인번호);
     });
     const unmatchedOnline = online.filter((o) => !matchedOnlineIds.has(o.승인번호));
 
-    // ✅ 정확한 수납 = 결제선생 + 영수증앱만
+    // ── 정확한 수납 합계
     const onlinePaid = online.reduce((s, o) => s + o.금액, 0);
-    const receiptTotal = (rcpts || []).reduce((s, r) => s + Number(r.amount || 0), 0);
+    const receiptTotal = receipts.reduce((s, r) => s + Number(r.amount || 0), 0);
     const totalPaid = onlinePaid + receiptTotal;
 
-    // 참고용
-    const off8Paid = off8WithPaid.filter(s => s.납부여부).reduce((s, o) => s + (o.실결제금액||0), 0);
-    const off7Paid = off7WithPaid.filter(s => s.납부여부).reduce((s, o) => s + (o.실결제금액||0), 0);
-
-    const discountStats = {};
-    allOffWithPaid.forEach((s) => { if (s.할인정보) discountStats[s.할인정보] = (discountStats[s.할인정보] || 0) + 1; });
-
     setData({
-      online, allOff: allOffWithPaid, off8: off8WithPaid, off7: off7WithPaid, unmatchedOnline,
+      online, allOff: [...off8WithPaid, ...off7WithPaid],
+      off8: off8WithPaid, off7: off7WithPaid, unmatchedOnline,
       stats: {
-        onlinePaid, off8Paid, off7Paid, receiptTotal, total: totalPaid,
+        onlinePaid, receiptTotal, total: totalPaid,
+        off8Paid: 0, off7Paid: 0,
         unpaidCnt: unpaid8.length + unpaid7.length,
-        unpaidAmt: 0,
+        unpaid8Cnt: unpaid8.length, unpaid7Cnt: unpaid7.length,
         students8: off8.length, students7: off7.length,
+        paid8Cnt: off8WithPaid.filter(s => s.납부여부).length,
+        paid7Cnt: off7WithPaid.filter(s => s.납부여부).length,
       },
-      discountStats,
+      discountStats: {},
     });
     setTab("summary");
   }, []);
@@ -400,14 +433,14 @@ export default function App() {
               <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 12 }}>📋 7층/8층 결제표 참고용 (집계 합계에 미포함)</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div style={{ background: C.surface, borderRadius: 10, padding: "12px 16px", border: `1px solid ${C.border}` }}>
-                  <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>8️⃣ 8층 기록상 수납액</div>
-                  <div style={{ fontWeight: 700, color: C.blue }}>{money(data.stats.off8Paid)}</div>
-                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>{data.off8.filter(s=>!s.미납).length}명 납부 · {data.off8.filter(s=>s.미납).length}명 미납</div>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>8️⃣ 8층 납부 현황</div>
+                  <div style={{ fontWeight: 700, color: C.blue }}>{data.stats.paid8Cnt}명 납부</div>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>{data.stats.unpaid8Cnt}명 미납 · 전체 {data.stats.students8}명</div>
                 </div>
                 <div style={{ background: C.surface, borderRadius: 10, padding: "12px 16px", border: `1px solid ${C.border}` }}>
-                  <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>7️⃣ 7층 기록상 수납액</div>
-                  <div style={{ fontWeight: 700, color: C.purple }}>{money(data.stats.off7Paid)}</div>
-                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>{data.off7.filter(s=>!s.미납).length}명 납부 · {data.off7.filter(s=>s.미납).length}명 미납</div>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>7️⃣ 7층 납부 현황</div>
+                  <div style={{ fontWeight: 700, color: C.purple }}>{data.stats.paid7Cnt}명 납부</div>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>{data.stats.unpaid7Cnt}명 미납 · 전체 {data.stats.students7}명</div>
                 </div>
               </div>
             </div>
@@ -425,9 +458,9 @@ export default function App() {
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                       {[
                         { k: "전체 학생", v: `${students.length}명` },
-                        { k: "결제 완료", v: `${paid.length}명`, c: C.success },
-                        { k: "미납", v: `${unpaid.length}명`, c: unpaid.length > 0 ? C.danger : C.textMuted },
-                        { k: "수납액", v: money(paid.reduce((s,o)=>s+o.실결제금액,0)), c: color },
+                        { k: "결제 완료", v: `${students.filter(s=>s.납부여부).length}명`, c: C.success },
+                        { k: "미납", v: `${students.filter(s=>!s.납부여부).length}명`, c: students.filter(s=>!s.납부여부).length > 0 ? C.danger : C.textMuted },
+                        { k: "납부율", v: `${Math.round(students.filter(s=>s.납부여부).length/students.length*100)||0}%`, c: color },
                       ].map(({ k, v, c }) => (
                         <div key={k} style={{ background: C.surfaceHigh, borderRadius: 10, padding: "12px 14px" }}>
                           <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>{k}</div>
