@@ -219,6 +219,7 @@ export default function App() {
   const receiptsRef = useRef([]);
   const scholarSetRef = useRef(new Set());
   const [scholarCount, setScholarCount] = useState(0);
+  const [scholarList, setScholarList] = useState([]);
 
   // ── 구글시트 자동 로드 (명단 + 결제표 장학생 정보)
   useEffect(() => {
@@ -237,6 +238,7 @@ export default function App() {
       // 8층결제표: A열=이름, M열(12번째)=장학생
       // 7층결제표: A열=이름, N열(13번째)=장학생
       const scholars = new Set();
+      // 8층결제표: A열(0번)=이름, M열(12번)=장학생
       pay8?.forEach(r => {
         const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
         const m = String(r[12] || "").trim().replace(/^"|"$/g, '');
@@ -245,17 +247,22 @@ export default function App() {
           console.log("8층 장학생:", name, "→", normalizeName(name));
         }
       });
+      // 7층결제표: A열(0번)=이름, N열(13번)=비고(장학생10%)
+      // N열이 14번째 열 (0-indexed: 13)
       pay7?.forEach(r => {
         const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
-        const n = String(r[13] || "").trim().replace(/^"|"$/g, '');
-        if (name && name !== "학생이름" && name !== "이름" && n.includes("장학생")) {
+        // N열 인덱스 0~27까지 확인
+        const allCols = r.map(c => String(c||"").trim().replace(/^"|"$/g,''));
+        const hasScholar = allCols.some(c => c.includes("장학생"));
+        if (name && name !== "학생이름" && name !== "이름" && hasScholar) {
           scholars.add(normalizeName(name));
-          console.log("7층 장학생:", name, "→", normalizeName(name));
+          console.log("7층 장학생:", name, "→", normalizeName(name), "| 비고:", allCols.filter(c=>c.includes("장학생")));
         }
       });
       console.log("총 장학생:", [...scholars]);
       scholarSetRef.current = scholars;
       setScholarCount(scholars.size);
+      setScholarList([...scholars]);
       setSheetLoading(false);
     }).catch(e => {
       setSheetError("구글시트 로드 실패: " + e.message);
@@ -421,8 +428,17 @@ export default function App() {
               </div>
             )}
             {!sheetLoading && scholarCount > 0 && (
-              <div style={{ fontSize: 13, color: "#f59e0b", marginBottom: 16 }}>
-                🎓 장학생 {scholarCount}명 자동 로드 완료
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 13, color: "#f59e0b", marginBottom: 6 }}>
+                  🎓 장학생 {scholarCount}명 자동 로드 완료 (현금결제 · 미납 제외)
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {scholarList.map((name, i) => (
+                    <span key={i} style={{ background: "#fef3c7", color: "#92400e", borderRadius: 20, padding: "3px 10px", fontSize: 12, fontWeight: 600 }}>
+                      🎓 {name}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
             <div style={{ display: "grid", gap: 12 }}>
