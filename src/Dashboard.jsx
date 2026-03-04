@@ -163,10 +163,25 @@ export default function App() {
   const [receipts, setReceipts] = useState([]);
   const [receiptLoading, setReceiptLoading] = useState(false);
 
+  // ref로 최신 wb 값 추적 (useState 비동기 문제 해결)
+  const onlineRef = useRef(null);
+  const wb8Ref = useRef(null);
+  const wb7Ref = useRef(null);
+  const receiptsRef = useRef([]);
+
   // ── Supabase에서 영수증 자동 로드
   useEffect(() => {
     setReceiptLoading(true);
-    getReceipts().then((data) => { setReceipts(data || []); setReceiptLoading(false); });
+    getReceipts().then((data) => {
+      const r = data || [];
+      setReceipts(r);
+      receiptsRef.current = r;
+      setReceiptLoading(false);
+      // 이미 파일 3개 다 올라가 있으면 재계산
+      if (onlineRef.current && wb8Ref.current && wb7Ref.current) {
+        processData(onlineRef.current, wb8Ref.current, wb7Ref.current, r);
+      }
+    });
   }, []);
 
   const processData = useCallback((owb, w8, w7, rcpts) => {
@@ -204,16 +219,9 @@ export default function App() {
     setTab("summary");
   }, []);
 
-  const handleOnline = (wb) => { setOnlineWb(wb); processData(wb, wb8, wb7, receipts); };
-  const handle8 = (wb) => { setWb8(wb); processData(onlineWb, wb, wb7, receipts); };
-  const handle7 = (wb) => { setWb7(wb); processData(onlineWb, wb8, wb, receipts); };
-
-  // receipts 로드 완료 후 데이터 재계산
-  useEffect(() => {
-    if (onlineWb && wb8 && wb7 && receipts.length >= 0) {
-      processData(onlineWb, wb8, wb7, receipts);
-    }
-  }, [receipts]);
+  const handleOnline = (wb) => { onlineRef.current = wb; setOnlineWb(wb); processData(wb, wb8Ref.current, wb7Ref.current, receiptsRef.current); };
+  const handle8 = (wb) => { wb8Ref.current = wb; setWb8(wb); processData(onlineRef.current, wb, wb7Ref.current, receiptsRef.current); };
+  const handle7 = (wb) => { wb7Ref.current = wb; setWb7(wb); processData(onlineRef.current, wb8Ref.current, wb, receiptsRef.current); };
 
   const filteredStudents = data?.allOff.filter((s) => {
     if (floorFilter !== "전체" && s.층 !== floorFilter) return false;
