@@ -4,6 +4,29 @@ import * as XLSX from "xlsx";
 const SUPABASE_URL = "https://jcwveyvqdjqxpznsfmpz.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impjd3ZleXZxZGpxeHB6bnNmbXB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MTMxODcsImV4cCI6MjA4ODE4OTE4N30.PjgghG0rWM73RdTTG9f5gsh1S8FA9y7GWByehux1JMM";
 
+// ── 구글시트 자동 로드
+const SHEET_ID = "1OVEffnCRTZ1A-cVCb4CYiYe3MicyI9TSkJNsau4mGVo";
+const fetchSheet = async (gid) => {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("구글시트 로드 실패");
+  const text = await res.text();
+  const rows = text.trim().split("\n").map(r => {
+    // CSV 파싱 (쉼표 구분, 따옴표 처리)
+    const cells = [];
+    let cur = "", inQ = false;
+    for (let i = 0; i < r.length; i++) {
+      if (r[i] === '"') { inQ = !inQ; }
+      else if (r[i] === ',' && !inQ) { cells.push(cur.trim()); cur = ""; }
+      else { cur += r[i]; }
+    }
+    cells.push(cur.trim());
+    return cells;
+  });
+  return rows;
+};
+
+const getReceipts = async () => 
 const getReceipts = async () => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/receipts?select=*&order=created_at.desc`, {
     headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` },
@@ -162,12 +185,34 @@ export default function App() {
   const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [receipts, setReceipts] = useState([]);
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [sheet8Rows, setSheet8Rows] = useState(null);
+  const [sheet7Rows, setSheet7Rows] = useState(null);
+  const [sheetLoading, setSheetLoading] = useState(true);
+  const [sheetError, setSheetError] = useState("");
 
   // ref로 최신 wb 값 추적 (useState 비동기 문제 해결)
   const onlineRef = useRef(null);
-  const wb8Ref = useRef(null);
-  const wb7Ref = useRef(null);
+  const sheet8Ref = useRef(null);
+  const sheet7Ref = useRef(null);
   const receiptsRef = useRef([]);
+
+  // ── 구글시트 자동 로드
+  useEffect(() => {
+    setSheetLoading(true);
+    Promise.all([
+      fetchSheet("0"),
+      fetchSheet("141026233"),
+    ]).then(([rows8, rows7]) => {
+      setSheet8Rows(rows8);
+      setSheet7Rows(rows7);
+      sheet8Ref.current = rows8;
+      sheet7Ref.current = rows7;
+      setSheetLoading(false);
+    }).catch(e => {
+      setSheetError("구글시트 로드 실패: " + e.message);
+      setSheetLoading(false);
+    });
+  }, []);
 
   // ── Supabase에서 영수증 자동 로드
   useEffect(() => {
@@ -177,20 +222,31 @@ export default function App() {
       setReceipts(r);
       receiptsRef.current = r;
       setReceiptLoading(false);
-      // 이미 파일 3개 다 올라가 있으면 재계산
-      if (onlineRef.current && wb8Ref.current && wb7Ref.current) {
-        processData(onlineRef.current, wb8Ref.current, wb7Ref.current, r);
+      if (onlineRef.current && sheet8Ref.current && sheet7Ref.current) {
+        processData(onlineRef.current, sheet8Ref.current, sheet7Ref.current, r);
       }
     });
   }, []);
 
-  const processData = useCallback((owb, w8, w7, rcpts) => {
-    if (!owb || !w8 || !w7) return;
+  // 구글시트 rows → 학생 목록 파싱
+  const parseSheetRows = useCallback((rows, floor) => {
+    if (!rows) return [];
+    return rows.slice(1).map(r => ({
+      이름: String(r[0] || "").trim(),
+      학생전화: normalizePhone(r[1]),
+      학부모전화: normalizePhone(r[2]),
+      학교: String(r[3] || "").trim(),
+      층: floor,
+      좌석유형: String(r[4] || "").trim(),
+      자리: String(r[5] || "").trim(),
+    })).filter(s => s.이름 && s.이름 !== "-" && s.이름 !== "이름");
+  }, []);
+
+  const processData = useCallback((owb, rows8, rows7, rcpts) => {
+    if (!owb || !rows8 || !rows7) return;
     const online = parseOnline(owb);
-    const sheet8 = w8.SheetNames[0];
-    const sheet7 = w7.SheetNames[0];
-    const off8 = parseOffline(w8, sheet8, "8층");
-    const off7 = parseOffline(w7, sheet7, "7층");
+    const off8 = parseSheetRows(rows8, "8층");
+    const off7 = parseSheetRows(rows7, "7층");
     const allOff = [...off8, ...off7];
 
     // ── 결제선생 기준 미납 파악 (이름 + 전화번호 끝 4자리)
@@ -241,9 +297,7 @@ export default function App() {
     setTab("summary");
   }, []);
 
-  const handleOnline = (wb) => { onlineRef.current = wb; setOnlineWb(wb); processData(wb, wb8Ref.current, wb7Ref.current, receiptsRef.current); };
-  const handle8 = (wb) => { wb8Ref.current = wb; setWb8(wb); processData(onlineRef.current, wb, wb7Ref.current, receiptsRef.current); };
-  const handle7 = (wb) => { wb7Ref.current = wb; setWb7(wb); processData(onlineRef.current, wb8Ref.current, wb, receiptsRef.current); };
+  const handleOnline = (wb) => { onlineRef.current = wb; setOnlineWb(wb); processData(wb, sheet8Ref.current, sheet7Ref.current, receiptsRef.current); };
 
   const filteredStudents = data?.allOff.filter((s) => {
     if (floorFilter !== "전체" && s.층 !== floorFilter) return false;
@@ -253,6 +307,13 @@ export default function App() {
   }) || [];
 
   // ── 업로드 화면
+  // 구글시트 로드되고 결제선생 올리면 자동 실행
+  useEffect(() => {
+    if (onlineWb && sheet8Rows && sheet7Rows) {
+      processData(onlineWb, sheet8Rows, sheet7Rows, receiptsRef.current);
+    }
+  }, [sheet8Rows, sheet7Rows]);
+
   if (!data) {
     return (
       <div style={{ minHeight: "100dvh", background: C.bg, fontFamily: "'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -269,14 +330,19 @@ export default function App() {
             )}
           </div>
           <div style={{ background: C.surface, borderRadius: 20, padding: 28, border: `1px solid ${C.border}`, boxShadow: "0 8px 40px rgba(76,110,245,0.10)" }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: C.textSub, marginBottom: 20 }}>📂 파일 3개를 업로드하면 자동으로 통합됩니다</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.textSub, marginBottom: 8 }}>📂 결제선생 파일만 업로드하면 됩니다!</div>
+            {sheetLoading && <div style={{ fontSize: 13, color: C.primary, marginBottom: 16 }}>⟳ 학생 명단 자동 로드 중...</div>}
+            {sheetError && <div style={{ fontSize: 13, color: C.danger, marginBottom: 16 }}>⚠️ {sheetError}</div>}
+            {!sheetLoading && !sheetError && (
+              <div style={{ fontSize: 13, color: C.success, marginBottom: 16 }}>
+                ✅ 학생 명단 자동 로드 완료 (8층 {sheet8Rows?.length-1 || 0}명 · 7층 {sheet7Rows?.length-1 || 0}명)
+              </div>
+            )}
             <div style={{ display: "grid", gap: 12 }}>
-              <DropZone label="온라인 결제 (결제선생 xlsx)" icon="🌐" onFile={handleOnline} loaded={!!onlineWb} />
-              <DropZone label="8층 전체 학생 명단 xlsx" icon="8️⃣" onFile={handle8} loaded={!!wb8} />
-              <DropZone label="7층 전체 학생 명단 xlsx" icon="7️⃣" onFile={handle7} loaded={!!wb7} />
+              <DropZone label="결제선생 xlsx 업로드" icon="💳" onFile={handleOnline} loaded={!!onlineWb} />
             </div>
           </div>
-          <p style={{ textAlign: "center", color: C.textMuted, fontSize: 12, marginTop: 20 }}>영수증 앱 데이터는 Supabase에서 자동으로 불러옵니다</p>
+          <p style={{ textAlign: "center", color: C.textMuted, fontSize: 12, marginTop: 20 }}>학생 명단 · 영수증 앱 데이터는 자동으로 불러옵니다 ☁️</p>
         </div>
       </div>
     );
@@ -285,7 +351,7 @@ export default function App() {
   const receiptTotal = data.stats.receiptTotal;
   const TABS = [
     { key: "summary", label: "📊 집계" },
-    { key: "students", label: "👥 학생 현황" },
+    { key: "students", label: `👥 학생 현황 (${data.allOff.length}명)` },
     { key: "unpaid", label: `⚠️ 미납 (${data.stats.unpaidCnt})` },
     { key: "receipts", label: `📱 영수증 앱 (${receipts.length})` },
     { key: "online", label: `🔵 미매칭 (${data.unmatchedOnline.length})` },
