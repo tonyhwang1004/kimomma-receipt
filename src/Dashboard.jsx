@@ -4,11 +4,11 @@ import * as XLSX from "xlsx";
 const SUPABASE_URL = "https://jcwveyvqdjqxpznsfmpz.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impjd3ZleXZxZGpxeHB6bnNmbXB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MTMxODcsImV4cCI6MjA4ODE4OTE4N30.PjgghG0rWM73RdTTG9f5gsh1S8FA9y7GWByehux1JMM";
 
-// ── 구글시트 자동 로드 (전체 행 반환)
+// ── 구글시트 자동 로드 (시트 이름으로 직접 접근)
 const SHEET_ID = "1OVEffnCRTZ1A-cVCb4CYiYe3MicyI9TSkJNsau4mGVo";
-const fetchSheet = async (gid) => {
-  // gviz API에 tq 쿼리로 전체 행 강제 반환
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}&tq=select%20*`;
+const fetchSheet = async (sheetName) => {
+  const encodedName = encodeURIComponent(sheetName);
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodedName}`;
   const res = await fetch(url, { mode: "cors" });
   if (!res.ok) throw new Error("구글시트 로드 실패 (" + res.status + ")");
   const text = await res.text();
@@ -199,8 +199,8 @@ export default function App() {
   useEffect(() => {
     setSheetLoading(true);
     Promise.all([
-      fetchSheet("0"),
-      fetchSheet("141026233"),
+      fetchSheet("8층전체학생명단"),
+      fetchSheet("7층전체학생명단"),
     ]).then(([rows8, rows7]) => {
       setSheet8Rows(rows8);
       setSheet7Rows(rows7);
