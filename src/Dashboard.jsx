@@ -232,19 +232,27 @@ export default function App() {
       setSheet7Rows(rows7);
       sheet8Ref.current = rows8;
       sheet7Ref.current = rows7;
-      // 장학생 이름 추출 (8층 M열, 7층 M/N열)
+      // 장학생 이름 추출
+      // 8층결제표: A열=이름, M열(12번째)=장학생
+      // 7층결제표: A열=이름, N열(13번째)=장학생
       const scholars = new Set();
-      pay8?.slice(1).forEach(r => {
+      pay8?.forEach(r => {
         const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
         const m = String(r[12] || "").trim().replace(/^"|"$/g, '');
-        if (name && m.includes("장학생")) scholars.add(normalizeName(name));
+        if (name && name !== "학생이름" && name !== "이름" && m.includes("장학생")) {
+          scholars.add(normalizeName(name));
+          console.log("8층 장학생:", name, "→", normalizeName(name));
+        }
       });
-      pay7?.slice(1).forEach(r => {
+      pay7?.forEach(r => {
         const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
-        const m = String(r[12] || "").trim().replace(/^"|"$/g, '');
         const n = String(r[13] || "").trim().replace(/^"|"$/g, '');
-        if (name && (m.includes("장학생") || n.includes("장학생"))) scholars.add(normalizeName(name));
+        if (name && name !== "학생이름" && name !== "이름" && n.includes("장학생")) {
+          scholars.add(normalizeName(name));
+          console.log("7층 장학생:", name, "→", normalizeName(name));
+        }
       });
+      console.log("총 장학생:", [...scholars]);
       scholarSetRef.current = scholars;
       setSheetLoading(false);
     }).catch(e => {
@@ -660,7 +668,7 @@ export default function App() {
         {tab === "online" && (
           <div>
             <div style={{ background: C.surfaceHigh, borderRadius: 14, padding: "16px 20px", border: `1px solid ${C.border}`, marginBottom: 20, fontSize: 13, color: C.textSub }}>
-              결제는 완료됐으나 현재 명단에 없는 학생입니다. (퇴원생 또는 결제선생 입력 오류)
+              퇴원생 명단 · 결제는 완료됐으나 현재 학생 명단에 없는 학생입니다.
             </div>
             {data.unmatchedOnline.map((o, i) => (
               <div key={i} style={{ background: C.surface, borderRadius: 12, padding: "14px 18px", border: `1px solid ${C.border}`, marginBottom: 8, display: "grid", gridTemplateColumns: "1fr 120px 120px 100px 120px", gap: 12, alignItems: "center", fontSize: 13 }}>
