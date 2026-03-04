@@ -4,15 +4,14 @@ import * as XLSX from "xlsx";
 const SUPABASE_URL = "https://jcwveyvqdjqxpznsfmpz.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impjd3ZleXZxZGpxeHB6bnNmbXB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MTMxODcsImV4cCI6MjA4ODE4OTE4N30.PjgghG0rWM73RdTTG9f5gsh1S8FA9y7GWByehux1JMM";
 
-// ── 구글시트 자동 로드
+// ── 구글시트 자동 로드 (gviz API - CORS 허용)
 const SHEET_ID = "1OVEffnCRTZ1A-cVCb4CYiYe3MicyI9TSkJNsau4mGVo";
 const fetchSheet = async (gid) => {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("구글시트 로드 실패");
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`;
+  const res = await fetch(url, { mode: "cors" });
+  if (!res.ok) throw new Error("구글시트 로드 실패 (" + res.status + ")");
   const text = await res.text();
   const rows = text.trim().split("\n").map(r => {
-    // CSV 파싱 (쉼표 구분, 따옴표 처리)
     const cells = [];
     let cur = "", inQ = false;
     for (let i = 0; i < r.length; i++) {
