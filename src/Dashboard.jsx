@@ -4,10 +4,11 @@ import * as XLSX from "xlsx";
 const SUPABASE_URL = "https://jcwveyvqdjqxpznsfmpz.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impjd3ZleXZxZGpxeHB6bnNmbXB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MTMxODcsImV4cCI6MjA4ODE4OTE4N30.PjgghG0rWM73RdTTG9f5gsh1S8FA9y7GWByehux1JMM";
 
-// ── 구글시트 자동 로드 (gviz API - CORS 허용)
+// ── 구글시트 자동 로드 (전체 행 반환)
 const SHEET_ID = "1OVEffnCRTZ1A-cVCb4CYiYe3MicyI9TSkJNsau4mGVo";
 const fetchSheet = async (gid) => {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`;
+  // gviz API에 tq 쿼리로 전체 행 강제 반환
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}&tq=select%20*`;
   const res = await fetch(url, { mode: "cors" });
   if (!res.ok) throw new Error("구글시트 로드 실패 (" + res.status + ")");
   const text = await res.text();
@@ -229,15 +230,17 @@ export default function App() {
   // 구글시트 rows → 학생 목록 파싱
   const parseSheetRows = useCallback((rows, floor) => {
     if (!rows) return [];
-    return rows.slice(1).map(r => ({
-      이름: String(r[0] || "").trim(),
-      학생전화: normalizePhone(r[1]),
-      학부모전화: normalizePhone(r[2]),
-      학교: String(r[3] || "").trim(),
-      층: floor,
-      좌석유형: String(r[4] || "").trim(),
-      자리: String(r[5] || "").trim(),
-    })).filter(s => s.이름 && s.이름 !== "-" && s.이름 !== "이름");
+    return rows
+      .filter(r => r[0] && String(r[0]).trim() !== "" && String(r[0]).trim() !== "학생이름" && String(r[0]).trim() !== "이름" && String(r[0]).trim() !== "-")
+      .map(r => ({
+        이름: String(r[0] || "").trim(),
+        학생전화: normalizePhone(r[1]),
+        학부모전화: normalizePhone(r[2]),
+        학교: String(r[3] || "").trim(),
+        층: floor,
+        좌석유형: String(r[4] || "").trim(),
+        자리: String(r[5] || "").trim(),
+      }));
   }, []);
 
   const processData = useCallback((owb, rows8, rows7, rcpts) => {
