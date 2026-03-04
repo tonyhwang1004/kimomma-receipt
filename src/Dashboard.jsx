@@ -26,7 +26,6 @@ const fetchSheet = async (gid) => {
   return rows;
 };
 
-const getReceipts = async () => 
 const getReceipts = async () => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/receipts?select=*&order=created_at.desc`, {
     headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` },
