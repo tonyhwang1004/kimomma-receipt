@@ -336,7 +336,7 @@ export default function App() {
             {sheetError && <div style={{ fontSize: 13, color: C.danger, marginBottom: 16 }}>⚠️ {sheetError}</div>}
             {!sheetLoading && !sheetError && (
               <div style={{ fontSize: 13, color: C.success, marginBottom: 16 }}>
-                ✅ 학생 명단 자동 로드 완료 (8층 {sheet8Rows?.length-1 || 0}명 · 7층 {sheet7Rows?.length-1 || 0}명)
+                ✅ 학생 명단 자동 로드 완료 (8층 {sheet8Rows?.filter(r=>r[0]&&r[0].trim()&&r[0].trim()!=='학생이름').length-1 || 0}명 · 7층 {sheet7Rows?.filter(r=>r[0]&&r[0].trim()&&r[0].trim()!=='학생이름').length-1 || 0}명)
               </div>
             )}
             <div style={{ display: "grid", gap: 12 }}>
