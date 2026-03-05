@@ -240,51 +240,37 @@ export default function App() {
       // 8층결제표: A열=이름, M열(12번째)=장학생
       // 7층결제표: A열=이름, N열(13번째)=장학생
       const scholars = new Set();
-      // 헤더 행에서 열 위치 동적으로 찾기
-      const findColIdx = (rows, keyword) => {
-        if (!rows || rows.length === 0) return -1;
-        const header = rows[0];
-        for (let i = 0; i < header.length; i++) {
-          if (String(header[i] || "").trim().replace(/^"|"$/g, '').includes(keyword)) return i;
-        }
-        return -1;
-      };
-
       const scholarAmounts = {};
 
-      // 8층결제표 헤더에서 열 위치 찾기
-      const amt8Col = findColIdx(pay8, "실 결제금액") !== -1 ? findColIdx(pay8, "실 결제금액") : findColIdx(pay8, "실결제금액");
-      const scholar8Col = findColIdx(pay8, "비고") !== -1 ? findColIdx(pay8, "비고") : findColIdx(pay8, "장학생");
-      console.log("8층 실결제금액 열:", amt8Col, "장학생 열:", scholar8Col);
-
-      pay8?.forEach(r => {
-        const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
-        const memo = String(r[scholar8Col] || "").trim().replace(/^"|"$/g, '');
-        const amt = Number(String(r[amt8Col] || "0").replace(/[^0-9.-]/g, '')) || 0;
-        if (name && name !== "학생이름" && name !== "이름" && name !== "-" && memo.includes("장학생")) {
-          const norm = normalizeName(name);
-          scholars.add(norm);
-          scholarAmounts[norm] = amt;
-          console.log("8층 장학생:", name, "→", norm, "금액:", amt);
+      // 8층/7층 결제표 전체 셀 스캔 - "장학생" 텍스트 있는 행의 A열=이름, K열=실결제금액
+      const scanScholar = (rows, label) => {
+        if (!rows) return;
+        // 헤더에서 실결제금액 열 찾기
+        let amtCol = -1;
+        if (rows[0]) {
+          for (let i = 0; i < rows[0].length; i++) {
+            const h = String(rows[0][i]||"").replace(/^"|"$/g,'').split(' ').join('');
+            if (h.includes("실결제금액")) { amtCol = i; break; }
+          }
         }
-      });
+        console.log(label, "실결제금액 열:", amtCol);
+        rows.forEach((r, ri) => {
+          const name = String(r[0]||"").trim().replace(/^"|"$/g,'');
+          if (!name || name === "이름" || name === "학생이름" || name === "-") return;
+          // 해당 행 모든 셀에서 장학생 텍스트 찾기
+          const hasScholar = r.some(c => String(c||"").replace(/^"|"$/g,'').includes("장학생"));
+          if (hasScholar) {
+            const norm = normalizeName(name);
+            const amt = amtCol >= 0 ? Number(String(r[amtCol]||"0").replace(/[^0-9.-]/g,'')) || 0 : 0;
+            scholars.add(norm);
+            scholarAmounts[norm] = amt;
+            console.log(label, "장학생:", name, "→", norm, "금액:", amt, "행:", ri);
+          }
+        });
+      };
 
-      // 7층결제표 헤더에서 열 위치 찾기
-      const amt7Col = findColIdx(pay7, "실 결제금액") !== -1 ? findColIdx(pay7, "실 결제금액") : findColIdx(pay7, "실결제금액");
-      const scholar7Col = findColIdx(pay7, "비고");
-      console.log("7층 실결제금액 열:", amt7Col, "비고 열:", scholar7Col);
-
-      pay7?.forEach(r => {
-        const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
-        const memo = String(r[scholar7Col] || "").trim().replace(/^"|"$/g, '');
-        const amt = Number(String(r[amt7Col] || "0").replace(/[^0-9.-]/g, '')) || 0;
-        if (name && name !== "학생이름" && name !== "이름" && name !== "-" && memo.includes("장학생")) {
-          const norm = normalizeName(name);
-          scholars.add(norm);
-          scholarAmounts[norm] = amt;
-          console.log("7층 장학생:", name, "→", norm, "금액:", amt);
-        }
-      });
+      scanScholar(pay8, "8층");
+      scanScholar(pay7, "7층");
       // 장학생 실납부액 = 실결제금액 × 90% 합산
       const scholarTotal = Object.values(scholarAmounts).reduce((s, a) => s + Math.round(a * 0.9), 0);
       console.log("장학생 실납부액 합계:", scholarTotal);
