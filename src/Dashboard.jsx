@@ -240,12 +240,12 @@ export default function App() {
       // 8층결제표: A열=이름, M열(12번째)=장학생
       // 7층결제표: A열=이름, N열(13번째)=장학생
       const scholars = new Set();
-      // 8층결제표: A열(0번)=이름, J열(9번)=실결제금액, M열(12번)=장학생
+      // 8층결제표: A열(0번)=이름, K열(10번)=실결제금액, M열(12번)=장학생
       const scholarAmounts = {};
       pay8?.forEach(r => {
         const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
         const m = String(r[12] || "").trim().replace(/^"|"$/g, '');
-        const amt = Number(String(r[9] || "0").replace(/[^0-9.-]/g, '')) || 0;
+        const amt = Number(String(r[10] || "0").replace(/[^0-9.-]/g, '')) || 0;
         if (name && name !== "학생이름" && name !== "이름" && m.includes("장학생")) {
           const norm = normalizeName(name);
           scholars.add(norm);
@@ -253,13 +253,12 @@ export default function App() {
           console.log("8층 장학생:", name, "실결제금액:", amt);
         }
       });
-      // 7층결제표: A열(0번)=이름, J열(9번)=실결제금액, N열=비고(장학생10%)
+      // 7층결제표: A열(0번)=이름, K열(10번)=실결제금액, N열(13번)=비고(장학생10%)
       pay7?.forEach(r => {
         const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
-        const allCols = r.map(c => String(c||"").trim().replace(/^"|"$/g,''));
-        const hasScholar = allCols.some(c => c.includes("장학생"));
-        const amt = Number(String(r[9] || "0").replace(/[^0-9.-]/g, '')) || 0;
-        if (name && name !== "학생이름" && name !== "이름" && hasScholar) {
+        const n = String(r[13] || "").trim().replace(/^"|"$/g, '');
+        const amt = Number(String(r[10] || "0").replace(/[^0-9.-]/g, '')) || 0;
+        if (name && name !== "학생이름" && name !== "이름" && n.includes("장학생")) {
           const norm = normalizeName(name);
           scholars.add(norm);
           scholarAmounts[norm] = amt;
