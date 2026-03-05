@@ -366,8 +366,11 @@ export default function App() {
   const processData = useCallback((owb, rows8, rows7, rcpts) => {
     if (!owb || !rows8 || !rows7) return;
     const online = parseOnline(owb);
-    const off8 = parseSheetRows(rows8, "8층");
-    const off7 = parseSheetRows(rows7, "7층");
+    const off8Raw = parseSheetRows(rows8, "8층");
+    const off7Raw = parseSheetRows(rows7, "7층");
+    // 결제표 금액 매핑
+    const off8 = off8Raw.map(s => ({ ...s, 결제금액: payAmountMap[normalizeName(s.이름)] || payAmountMap[baseNameOnly(s.이름)] || 0 }));
+    const off7 = off7Raw.map(s => ({ ...s, 결제금액: payAmountMap[normalizeName(s.이름)] || payAmountMap[baseNameOnly(s.이름)] || 0 }));
     const allOff = [...off8, ...off7];
     const receipts = rcpts || [];
 
@@ -388,7 +391,6 @@ export default function App() {
 
     // 장학생 세트
     const scholarSet = scholarSetRef.current;
-    // 결제표 금액 데이터 (학생이름 → 결제금액)
     const payAmountMap = payAmountMapRef.current || {};
 
     // ── 납부여부 체크: 결제선생 OR 영수증앱 OR 장학생
