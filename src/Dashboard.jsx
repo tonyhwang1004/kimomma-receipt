@@ -343,7 +343,8 @@ export default function App() {
       buildAmountMap(pay7);
       pay8Ref.current = pay8;
       pay7Ref.current = pay7;
-      console.log("결제표 금액 맵:", Object.keys(payAmountMapRef.current).length, "명");
+      const mapKeys = Object.keys(payAmountMapRef.current);
+      console.log("결제표 금액 맵:", mapKeys.length, "명", mapKeys.slice(0,5));
       console.log("총 장학생:", [...scholars]);
       scholarSetRef.current = scholars;
       setScholarCount(scholars.size);
