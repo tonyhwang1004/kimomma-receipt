@@ -322,26 +322,20 @@ export default function App() {
       scholarSetRef.current = scholars;
       scholarTotalRef.current = scholarTotal;
       // 결제표 금액 맵 생성
-      const buildAmountMap = (rows) => {
-        if (!rows) return;
-        let amtCol = -1;
-        rows.forEach(r => {
-          if (amtCol >= 0) return;
-          r.forEach((cell, i) => {
-            const h = String(cell||"").replace(/^"|"$/g,'').split(' ').join('');
-            if (h === "실결제금액") amtCol = i;
-          });
-        });
-        rows.forEach(r => {
-          const name = normalizeName(String(r[0]||"").trim().replace(/^"|"$/g,''));
-          if (!name || name === "이름" || name === "학생이름" || name === "-") return;
-          const amt = amtCol >= 0 ? Number(String(r[amtCol]||"0").replace(/[^0-9.-]/g,'')) || 0 : 0;
-          if (amt > 0) payAmountMapRef.current[name] = amt;
-        });
-      };
+      // 8층: I열(8번)=결제금액, 7층: J열(9번)=결제금액
       payAmountMapRef.current = {};
-      buildAmountMap(pay8);
-      buildAmountMap(pay7);
+      pay8?.forEach(r => {
+        const name = normalizeName(String(r[0]||"").trim().replace(/^"|"$/g,''));
+        if (!name || name === "이름" || name === "학생이름" || name === "-") return;
+        const amt = Number(String(r[8]||"0").replace(/[^0-9.-]/g,'')) || 0;
+        if (amt > 0) payAmountMapRef.current[name] = amt;
+      });
+      pay7?.forEach(r => {
+        const name = normalizeName(String(r[0]||"").trim().replace(/^"|"$/g,''));
+        if (!name || name === "이름" || name === "학생이름" || name === "-") return;
+        const amt = Number(String(r[9]||"0").replace(/[^0-9.-]/g,'')) || 0;
+        if (amt > 0) payAmountMapRef.current[name] = amt;
+      });
       pay8Ref.current = pay8;
       pay7Ref.current = pay7;
       const mapKeys = Object.keys(payAmountMapRef.current);
