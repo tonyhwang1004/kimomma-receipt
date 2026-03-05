@@ -257,7 +257,7 @@ export default function App() {
       const scholar8Col = findColIdx(pay8, "비고") !== -1 ? findColIdx(pay8, "비고") : findColIdx(pay8, "장학생");
       console.log("8층 실결제금액 열:", amt8Col, "장학생 열:", scholar8Col);
 
-      pay8?.slice(1).forEach(r => {
+      pay8?.forEach(r => {
         const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
         const memo = String(r[scholar8Col] || "").trim().replace(/^"|"$/g, '');
         const amt = Number(String(r[amt8Col] || "0").replace(/[^0-9.-]/g, '')) || 0;
@@ -274,7 +274,7 @@ export default function App() {
       const scholar7Col = findColIdx(pay7, "비고");
       console.log("7층 실결제금액 열:", amt7Col, "비고 열:", scholar7Col);
 
-      pay7?.slice(1).forEach(r => {
+      pay7?.forEach(r => {
         const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
         const memo = String(r[scholar7Col] || "").trim().replace(/^"|"$/g, '');
         const amt = Number(String(r[amt7Col] || "0").replace(/[^0-9.-]/g, '')) || 0;
