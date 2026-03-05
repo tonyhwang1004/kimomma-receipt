@@ -366,6 +366,7 @@ export default function App() {
   const processData = useCallback((owb, rows8, rows7, rcpts) => {
     if (!owb || !rows8 || !rows7) return;
     const online = parseOnline(owb);
+    const payAmountMap = payAmountMapRef.current || {};
     const off8Raw = parseSheetRows(rows8, "8층");
     const off7Raw = parseSheetRows(rows7, "7층");
     // 결제표 금액 매핑 (processData 안에서 처리)
@@ -401,7 +402,6 @@ export default function App() {
 
     // 장학생 세트
     const scholarSet = scholarSetRef.current;
-    const payAmountMap = payAmountMapRef.current || {};
 
     // ── 납부여부 체크: 결제선생 OR 영수증앱 OR 장학생
     const checkPaid = (s) => {
