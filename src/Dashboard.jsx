@@ -368,9 +368,10 @@ export default function App() {
     const online = parseOnline(owb);
     const off8Raw = parseSheetRows(rows8, "8층");
     const off7Raw = parseSheetRows(rows7, "7층");
-    // 결제표 금액 매핑
-    const off8 = off8Raw.map(s => ({ ...s, 결제금액: payAmountMap[normalizeName(s.이름)] || payAmountMap[baseNameOnly(s.이름)] || 0 }));
-    const off7 = off7Raw.map(s => ({ ...s, 결제금액: payAmountMap[normalizeName(s.이름)] || payAmountMap[baseNameOnly(s.이름)] || 0 }));
+    // 결제표 금액 매핑 (processData 안에서 처리)
+    const mapAmt = (s) => ({ ...s, 결제금액: payAmountMap[normalizeName(s.이름)] || payAmountMap[baseNameOnly(s.이름)] || 0 });
+    const off8 = off8Raw.map(mapAmt);
+    const off7 = off7Raw.map(mapAmt);
     const allOff = [...off8, ...off7];
     const receipts = rcpts || [];
 
