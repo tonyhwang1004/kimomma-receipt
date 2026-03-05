@@ -238,6 +238,7 @@ export default function App() {
   const receiptsRef = useRef([]);
   const scholarSetRef = useRef(new Set());
   const scholarTotalRef = useRef(0);
+  const payAmountMapRef = useRef({});
   const [scholarCount, setScholarCount] = useState(0);
   const [scholarList, setScholarList] = useState([]);
   const [scholarTotal, setScholarTotal] = useState(0);
@@ -387,6 +388,8 @@ export default function App() {
 
     // 장학생 세트
     const scholarSet = scholarSetRef.current;
+    // 결제표 금액 데이터 (학생이름 → 결제금액)
+    const payAmountMap = payAmountMapRef.current || {};
 
     // ── 납부여부 체크: 결제선생 OR 영수증앱 OR 장학생
     const checkPaid = (s) => {
@@ -436,6 +439,7 @@ export default function App() {
         off8Paid: 0, off7Paid: 0,
         unpaidCnt: unpaid8.length + unpaid7.length,
         unpaid8Cnt: unpaid8.length, unpaid7Cnt: unpaid7.length,
+        unpaidTotal: [...unpaid8, ...unpaid7].reduce((s, u) => s + (u.결제금액||0), 0),
         students8: off8.length, students7: off7.length,
         paid8Cnt: off8WithPaid.filter(s => s.납부여부).length,
         paid7Cnt: off7WithPaid.filter(s => s.납부여부).length,
@@ -645,6 +649,9 @@ export default function App() {
                 <div style={{ fontWeight: 700, color: !s.납부여부 ? C.danger : C.success }}>
                   {!s.납부여부 ? "⚠️ 미납" : scholarSetRef.current.has(normalizeName(s.이름)) ? "🎓 장학생" : "✅ 납부"}
                 </div>
+                {!s.납부여부 && s.미납금액 > 0 && (
+                  <div style={{ fontSize: 11, color: C.danger, marginTop: 2, fontWeight: 600 }}>{money(s.미납금액)}</div>
+                )}
                 <div><Badge color={s.결제방식 === "카드" ? C.blue : s.결제방식 === "현금" ? C.success : C.danger}>{s.결제방식 || "-"}</Badge></div>
                 <div style={{ fontSize: 11, color: C.warning }}>{s.할인정보}</div>
               </div>
@@ -672,6 +679,7 @@ export default function App() {
                       <div>
                         <div style={{ fontWeight: 700 }}>{s.이름} {scholarSetRef.current.has(normalizeName(s.이름)) && <span style={{ fontSize: 11, color: C.warning, fontWeight: 700 }}>🎓 장학생</span>}</div>
                         <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{s.학교} · {s.좌석유형} {s.자리}번</div>
+                        {s.결제금액 > 0 && <div style={{ fontSize: 12, color: C.danger, fontWeight: 700, marginTop: 3 }}>미납 추정: {money(s.결제금액)}</div>}
                       </div>
                       <Badge color={floor === "8층" ? C.blue : C.purple}>{floor}</Badge>
                       <div style={{ fontSize: 13, color: C.textSub }}>{s.결제일}</div>
