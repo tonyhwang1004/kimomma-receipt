@@ -6,6 +6,25 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 // ── 구글시트 자동 로드 (시트 이름으로 직접 접근)
 const SHEET_ID = "1OVEffnCRTZ1A-cVCb4CYiYe3MicyI9TSkJNsau4mGVo";
+const fetchSheetByGid = async (gid) => {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
+  const res = await fetch(url, { mode: "cors" });
+  if (!res.ok) throw new Error("구글시트 로드 실패 (gid=" + gid + " " + res.status + ")");
+  const text = await res.text();
+  const rows = text.trim().split("\n").map(r => {
+    const cells = [];
+    let cur = "", inQ = false;
+    for (let i = 0; i < r.length; i++) {
+      if (r[i] === '"') { inQ = !inQ; }
+      else if (r[i] === ',' && !inQ) { cells.push(cur.trim().replace(/^"|"$/g, '')); cur = ""; }
+      else { cur += r[i]; }
+    }
+    cells.push(cur.trim().replace(/^"|"$/g, ''));
+    return cells;
+  });
+  return rows;
+};
+
 const fetchSheet = async (sheetName) => {
   const encodedName = encodeURIComponent(sheetName);
   // range를 크게 잡아서 빈 행 포함 전체 데이터 강제 로드
@@ -230,7 +249,7 @@ export default function App() {
       fetchSheet("8층전체학생명단"),
       fetchSheet("7층전체학생명단"),
       fetchSheet("3월8층결제표"),
-      fetchSheet("3월7층결제표"),
+      fetchSheetByGid("1777631490"),
     ]).then(([rows8, rows7, pay8, pay7]) => {
       setSheet8Rows(rows8);
       setSheet7Rows(rows7);
