@@ -245,14 +245,15 @@ export default function App() {
       // 8층/7층 결제표 전체 셀 스캔 - "장학생" 텍스트 있는 행의 A열=이름, K열=실결제금액
       const scanScholar = (rows, label) => {
         if (!rows) return;
-        // 헤더에서 실결제금액 열 찾기
+        // 헤더에서 실결제금액 열 찾기 (전체 행 스캔)
         let amtCol = -1;
-        if (rows[0]) {
-          for (let i = 0; i < rows[0].length; i++) {
-            const h = String(rows[0][i]||"").replace(/^"|"$/g,'').split(' ').join('');
-            if (h.includes("실결제금액")) { amtCol = i; break; }
-          }
-        }
+        rows.forEach(r => {
+          if (amtCol >= 0) return;
+          r.forEach((cell, i) => {
+            const h = String(cell||"").replace(/^"|"$/g,'').split(' ').join('');
+            if (h === "실결제금액") { amtCol = i; }
+          });
+        });
         console.log(label, "실결제금액 열:", amtCol);
         rows.forEach((r, ri) => {
           const name = String(r[0]||"").trim().replace(/^"|"$/g,'');
@@ -261,7 +262,16 @@ export default function App() {
           const hasScholar = r.some(c => String(c||"").replace(/^"|"$/g,'').includes("장학생"));
           if (hasScholar) {
             const norm = normalizeName(name);
-            const amt = amtCol >= 0 ? Number(String(r[amtCol]||"0").replace(/[^0-9.-]/g,'')) || 0 : 0;
+            // 금액: 헤더로 못 찾으면 행에서 가장 큰 숫자 사용
+            let amt = 0;
+            if (amtCol >= 0) {
+              amt = Number(String(r[amtCol]||"0").replace(/[^0-9.-]/g,'')) || 0;
+            } else {
+              r.forEach(c => {
+                const n = Number(String(c||"").replace(/[^0-9]/g,''));
+                if (n > 100000 && n > amt) amt = n;
+              });
+            }
             scholars.add(norm);
             scholarAmounts[norm] = amt;
             console.log(label, "장학생:", name, "→", norm, "금액:", amt, "행:", ri);
