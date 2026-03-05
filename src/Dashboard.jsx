@@ -298,10 +298,22 @@ export default function App() {
         });
       };
 
+      const pay7ScholarNames = new Set();
       scanScholar(pay8, "8층");
+      // 7층 장학생은 카드결제 → 결제선생에 포함됨 → 납부액 별도 계산 불필요
+      pay7?.forEach(r => {
+        const name = String(r[0]||"").trim().replace(/^"|"$/g,'');
+        if (!name || name === "이름" || name === "학생이름" || name === "-") return;
+        const hasScholar = r.some(c => String(c||"").replace(/^"|"$/g,'').includes("장학생"));
+        if (hasScholar) pay7ScholarNames.add(normalizeName(name));
+      });
+      // 7층 장학생도 미납 제외를 위해 scholars에는 추가
+      pay7ScholarNames.forEach(n => scholars.add(n));
       scanScholar(pay7, "7층");
-      // 장학생 실납부액 = 실결제금액 × 90% 합산
-      const scholarTotal = Object.values(scholarAmounts).reduce((s, a) => s + Math.round(a * 0.9), 0);
+      // 장학생 실납부액 = 8층만 현금결제 × 90% 합산 (7층은 카드결제로 결제선생에 포함)
+      const scholarTotal = Object.entries(scholarAmounts)
+        .filter(([name]) => !pay7ScholarNames.has(name))
+        .reduce((s, [, a]) => s + Math.round(a * 0.9), 0);
       console.log("장학생 실납부액 합계:", scholarTotal);
       scholarSetRef.current = scholars;
       scholarTotalRef.current = scholarTotal;
