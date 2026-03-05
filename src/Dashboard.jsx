@@ -6,6 +6,7 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 // ── 구글시트 자동 로드 (시트 이름으로 직접 접근)
 const SHEET_ID = "1OVEffnCRTZ1A-cVCb4CYiYe3MicyI9TSkJNsau4mGVo";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwiXGtjVut9hOGZpbN5QkEVHKanQbYeA1jA1_LbTbA7pbhtMj68wOJ0vCcMMc9LPEykTA/exec";
 const fetchSheetByGid = async (gid) => {
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
   const res = await fetch(url, { mode: "cors" });
@@ -245,6 +246,9 @@ export default function App() {
   const [scholarList, setScholarList] = useState([]);
   const [scholarTotal, setScholarTotal] = useState(0);
   const [editAmounts, setEditAmounts] = useState({});
+  const [resetting, setResetting] = useState(false);
+  const [pastMonths, setPastMonths] = useState([]);
+  const [selectedMonth, setSelectedMonth] = useState(null);
 
   // ── 구글시트 자동 로드 (명단 + 결제표 장학생 정보)
   useEffect(() => {
@@ -350,6 +354,58 @@ export default function App() {
       setSheetLoading(false);
     });
   }, []);
+
+  // ── 과거 월 목록 로드
+  useEffect(() => {
+    fetch(`${APPS_SCRIPT_URL}?action=getMonths`)
+      .then(r => r.json())
+      .then(d => setPastMonths(d.months || []))
+      .catch(() => {});
+  }, []);
+
+  // ── 월 리셋 함수
+  const handleReset = async () => {
+    if (!window.confirm("⚠️ 이번 달 영수증을 구글시트에 저장하고 Supabase를 초기화할까요?\n\n이 작업은 되돌릴 수 없어요!")) return;
+    setResetting(true);
+    try {
+      // 1. 현재 영수증 데이터 구글시트에 백업
+      const now = new Date();
+      const yearMonth = `${now.getFullYear()}_${String(now.getMonth()+1).padStart(2,'0')}`;
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "backup", yearMonth, receipts: receiptsRef.current })
+      });
+      const result = await res.json();
+      if (!result.success) throw new Error("구글시트 저장 실패");
+
+      // 2. Supabase 영수증 전체 삭제
+      const delRes = await fetch(`${SUPABASE_URL}/rest/v1/receipts?id=gte.0`, {
+        method: "DELETE",
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" }
+      });
+
+      // 3. 상태 초기화
+      setReceipts([]);
+      receiptsRef.current = [];
+      setData(null);
+      setOnlineWb(null);
+      onlineRef.current = null;
+      setPastMonths(prev => [yearMonth, ...prev.filter(m => m !== yearMonth)]);
+      alert(`✅ ${yearMonth.replace('_','년 ')}월 데이터가 구글시트에 저장됐어요!\n영수증 ${result.count}건 백업 완료\n\n새 달이 시작됐어요 🎉`);
+    } catch(e) {
+      alert("❌ 리셋 실패: " + e.message);
+    }
+    setResetting(false);
+  };
+
+  // ── 과거 월 영수증 조회
+  const loadPastMonth = async (yearMonth) => {
+    setSelectedMonth(yearMonth);
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=getReceipts&yearMonth=${yearMonth}`);
+    const data = await res.json();
+    alert(`📋 ${yearMonth.replace('_','년 ')}월 영수증 ${data.receipts?.length || 0}건\n합계: ${(data.receipts||[]).reduce((s,r)=>s+Number(r.amount||0),0).toLocaleString()}원`);
+  };
 
   // ── Supabase에서 영수증 자동 로드
   useEffect(() => {
@@ -573,6 +629,15 @@ export default function App() {
         <button onClick={() => { setData(null); setOnlineWb(null); setWb8(null); setWb7(null); }}
           style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.textSub, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>🔄 새로 불러오기</button>
         <button onClick={() => { setOnlineWb(null); onlineRef.current = null; setData(null); }} style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.textSub, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500, marginLeft: 8 }}>🏠 홈으로</button>
+        <button onClick={handleReset} disabled={resetting} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #ef4444", background: "transparent", color: "#ef4444", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, marginLeft: 8 }}>
+          {resetting ? "⏳ 저장 중..." : "🔄 월 마감·리셋"}
+        </button>
+        {pastMonths.length > 0 && (
+          <select onChange={e => e.target.value && loadPastMonth(e.target.value)} value="" style={{ marginLeft: 8, padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.textSub, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+            <option value="">📂 과거 기록</option>
+            {pastMonths.map(m => <option key={m} value={m}>{m.replace('_','년 ')}월</option>)}
+          </select>
+        )}
       </div>
 
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 20px" }}>
