@@ -700,8 +700,27 @@ export default function App() {
             <div style={{ background: C.dangerBg, borderRadius: 14, padding: "16px 20px", border: `1px solid ${C.danger}44`, marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ fontWeight: 700, color: C.danger, fontSize: 15 }}>⚠️ 미납 학생 현황</div>
-                <div style={{ fontSize: 13, color: C.textSub, marginTop: 4 }}>총 {data.stats.unpaidCnt}명 · 결제선생 미매칭 기준</div>
+                <div style={{ fontSize: 13, color: C.textSub, marginTop: 4 }}>
+                  총 {data.stats.unpaidCnt}명 ·
+                  <span style={{ color: C.danger, fontWeight: 700 }}> 미납 추정 총액: {money(
+                    [...(data.off8||[]), ...(data.off7||[])].filter(s=>!s.납부여부).reduce((sum, s) => sum + (editAmounts[s.이름] !== undefined ? editAmounts[s.이름] : (s.결제금액||0)), 0)
+                  )}</span>
+                </div>
               </div>
+              <button onClick={() => {
+                const unpaid = [...(data.off8||[]), ...(data.off7||[])].filter(s=>!s.납부여부);
+                const total = unpaid.reduce((sum, s) => sum + (editAmounts[s.이름] !== undefined ? editAmounts[s.이름] : (s.결제금액||0)), 0);
+                const u8 = unpaid.filter(s=>s.층==="8층");
+                const u7 = unpaid.filter(s=>s.층==="7층");
+                const fmt = (list) => list.map(s => {
+                  const amt = editAmounts[s.이름] !== undefined ? editAmounts[s.이름] : (s.결제금액||0);
+                  return `• ${s.이름} (${s.좌석유형} ${s.자리}번) ${amt > 0 ? money(amt) : "금액미확인"}`;
+                }).join("\n");
+                const text = `📚 김엄마독서실 미납 현황 (${new Date().toLocaleDateString("ko-KR")})\n\n🏢 8층 미납 ${u8.length}명\n${fmt(u8)}\n\n🏢 7층 미납 ${u7.length}명\n${fmt(u7)}\n\n💰 미납 추정 총액: ${money(total)}\n총 ${unpaid.length}명`;
+                navigator.clipboard.writeText(text).then(() => alert("📋 클립보드에 복사됐어요!\n카카오톡에 붙여넣기 하세요 😊"));
+              }} style={{ padding: "8px 16px", borderRadius: 10, background: "#FEE500", color: "#3A1D1D", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                📋 카카오톡 복사
+              </button>
             </div>
             {["8층", "7층"].map((floor) => {
               const unpaidList = (floor === "8층" ? data.off8 : data.off7).filter(s => !s.납부여부);
