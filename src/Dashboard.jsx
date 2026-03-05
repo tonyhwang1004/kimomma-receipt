@@ -218,8 +218,10 @@ export default function App() {
   const sheet7Ref = useRef(null);
   const receiptsRef = useRef([]);
   const scholarSetRef = useRef(new Set());
+  const scholarTotalRef = useRef(0);
   const [scholarCount, setScholarCount] = useState(0);
   const [scholarList, setScholarList] = useState([]);
+  const [scholarTotal, setScholarTotal] = useState(0);
 
   // ── 구글시트 자동 로드 (명단 + 결제표 장학생 정보)
   useEffect(() => {
@@ -238,27 +240,37 @@ export default function App() {
       // 8층결제표: A열=이름, M열(12번째)=장학생
       // 7층결제표: A열=이름, N열(13번째)=장학생
       const scholars = new Set();
-      // 8층결제표: A열(0번)=이름, M열(12번)=장학생
+      // 8층결제표: A열(0번)=이름, J열(9번)=실결제금액, M열(12번)=장학생
+      const scholarAmounts = {};
       pay8?.forEach(r => {
         const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
         const m = String(r[12] || "").trim().replace(/^"|"$/g, '');
+        const amt = Number(String(r[9] || "0").replace(/[^0-9.-]/g, '')) || 0;
         if (name && name !== "학생이름" && name !== "이름" && m.includes("장학생")) {
-          scholars.add(normalizeName(name));
-          console.log("8층 장학생:", name, "→", normalizeName(name));
+          const norm = normalizeName(name);
+          scholars.add(norm);
+          scholarAmounts[norm] = amt;
+          console.log("8층 장학생:", name, "실결제금액:", amt);
         }
       });
-      // 7층결제표: A열(0번)=이름, N열(13번)=비고(장학생10%)
-      // N열이 14번째 열 (0-indexed: 13)
+      // 7층결제표: A열(0번)=이름, J열(9번)=실결제금액, N열=비고(장학생10%)
       pay7?.forEach(r => {
         const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
-        // N열 인덱스 0~27까지 확인
         const allCols = r.map(c => String(c||"").trim().replace(/^"|"$/g,''));
         const hasScholar = allCols.some(c => c.includes("장학생"));
+        const amt = Number(String(r[9] || "0").replace(/[^0-9.-]/g, '')) || 0;
         if (name && name !== "학생이름" && name !== "이름" && hasScholar) {
-          scholars.add(normalizeName(name));
-          console.log("7층 장학생:", name, "→", normalizeName(name), "| 비고:", allCols.filter(c=>c.includes("장학생")));
+          const norm = normalizeName(name);
+          scholars.add(norm);
+          scholarAmounts[norm] = amt;
+          console.log("7층 장학생:", name, "실결제금액:", amt);
         }
       });
+      // 장학생 실납부액 = 실결제금액 × 90% 합산
+      const scholarTotal = Object.values(scholarAmounts).reduce((s, a) => s + Math.round(a * 0.9), 0);
+      console.log("장학생 실납부액 합계:", scholarTotal);
+      scholarSetRef.current = scholars;
+      scholarTotalRef.current = scholarTotal;
       console.log("총 장학생:", [...scholars]);
       scholarSetRef.current = scholars;
       setScholarCount(scholars.size);
@@ -367,13 +379,14 @@ export default function App() {
     // ── 정확한 수납 합계
     const onlinePaid = online.reduce((s, o) => s + o.금액, 0);
     const receiptTotal = receipts.reduce((s, r) => s + Number(r.amount || 0), 0);
-    const totalPaid = onlinePaid + receiptTotal;
+    const scholarPaid = scholarTotalRef.current;
+    const totalPaid = onlinePaid + receiptTotal + scholarPaid;
 
     setData({
       online, allOff: [...off8WithPaid, ...off7WithPaid],
       off8: off8WithPaid, off7: off7WithPaid, unmatchedOnline,
       stats: {
-        onlinePaid, receiptTotal, total: totalPaid,
+        onlinePaid, receiptTotal, scholarPaid, total: totalPaid,
         off8Paid: 0, off7Paid: 0,
         unpaidCnt: unpaid8.length + unpaid7.length,
         unpaid8Cnt: unpaid8.length, unpaid7Cnt: unpaid7.length,
@@ -487,13 +500,14 @@ export default function App() {
           <div>
             {/* 정확한 수납 집계 */}
             <div style={{ background: C.surface, borderRadius: 16, padding: "16px 20px", border: `2px solid ${C.primary}`, marginBottom: 20 }}>
-              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>✅ 정확한 전체 수납 합계 (결제선생 + 영수증앱)</div>
+              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>✅ 정확한 전체 수납 합계 (결제선생 + 영수증앱 + 장학생)</div>
               <div style={{ fontSize: 32, fontWeight: 800, color: C.primary, letterSpacing: -1 }}>{money(data.stats.total)}</div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 28 }}>
               <StatCard icon="💳" label="결제선생 (온라인)" value={money(data.stats.onlinePaid)} sub={`${data.online.length}건 · 카드/간편결제`} color={C.blue} glow />
               <StatCard icon="🧾" label="영수증앱 (오프라인)" value={money(data.stats.receiptTotal)} sub={`${receipts.length}건 · 현장 현금 등`} color={C.warning} glow />
+              <StatCard icon="🎓" label="장학생 납부 (현금·90%)" value={money(data.stats.scholarPaid)} sub={`${scholarCount}명 · 할인 10% 적용`} color="#f59e0b" glow />
               <StatCard icon="⚠️" label="미납 학생" value={`${data.stats.unpaidCnt}명`} sub={`추정 미수금 ${money(data.stats.unpaidAmt)}`} color={C.danger} />
             </div>
 
