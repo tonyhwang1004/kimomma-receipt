@@ -244,6 +244,7 @@ export default function App() {
   const [scholarCount, setScholarCount] = useState(0);
   const [scholarList, setScholarList] = useState([]);
   const [scholarTotal, setScholarTotal] = useState(0);
+  const [editAmounts, setEditAmounts] = useState({});
 
   // ── 구글시트 자동 로드 (명단 + 결제표 장학생 정보)
   useEffect(() => {
@@ -478,7 +479,7 @@ export default function App() {
         off8Paid: 0, off7Paid: 0,
         unpaidCnt: unpaid8.length + unpaid7.length,
         unpaid8Cnt: unpaid8.length, unpaid7Cnt: unpaid7.length,
-        unpaidTotal: [...unpaid8, ...unpaid7].reduce((s, u) => s + (u.결제금액||0), 0),
+        unpaidAmt: [...unpaid8, ...unpaid7].reduce((s, u) => s + (u.결제금액||0), 0),
         students8: off8.length, students7: off7.length,
         paid8Cnt: off8WithPaid.filter(s => s.납부여부).length,
         paid7Cnt: off7WithPaid.filter(s => s.납부여부).length,
@@ -577,6 +578,7 @@ export default function App() {
         </div>
         <button onClick={() => { setData(null); setOnlineWb(null); setWb8(null); setWb7(null); }}
           style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.textSub, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>🔄 새로 불러오기</button>
+        <button onClick={() => { setOnlineWb(null); onlineRef.current = null; setData(null); }} style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.textSub, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500, marginLeft: 8 }}>🏠 홈으로</button>
       </div>
 
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 20px" }}>
@@ -718,7 +720,17 @@ export default function App() {
                       <div>
                         <div style={{ fontWeight: 700 }}>{s.이름} {scholarSetRef.current.has(normalizeName(s.이름)) && <span style={{ fontSize: 11, color: C.warning, fontWeight: 700 }}>🎓 장학생</span>}</div>
                         <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{s.학교} · {s.좌석유형} {s.자리}번</div>
-                        {s.결제금액 > 0 && <div style={{ fontSize: 12, color: C.danger, fontWeight: 700, marginTop: 3 }}>미납 추정: {money(s.결제금액)}</div>}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                          <span style={{ fontSize: 12, color: C.textMuted }}>미납금액:</span>
+                          <input
+                            type="number"
+                            value={editAmounts[s.이름] !== undefined ? editAmounts[s.이름] : (s.결제금액 || "")}
+                            onChange={e => setEditAmounts(prev => ({ ...prev, [s.이름]: Number(e.target.value) }))}
+                            placeholder="금액 입력"
+                            style={{ width: 110, padding: "2px 6px", borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, fontFamily: "inherit", color: C.danger, fontWeight: 700 }}
+                          />
+                          <span style={{ fontSize: 12, color: C.danger, fontWeight: 700 }}>원</span>
+                        </div>
                       </div>
                       <Badge color={floor === "8층" ? C.blue : C.purple}>{floor}</Badge>
                       <div style={{ fontSize: 13, color: C.textSub }}>{s.결제일}</div>
