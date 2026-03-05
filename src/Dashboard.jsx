@@ -240,29 +240,49 @@ export default function App() {
       // 8층결제표: A열=이름, M열(12번째)=장학생
       // 7층결제표: A열=이름, N열(13번째)=장학생
       const scholars = new Set();
-      // 8층결제표: A열(0번)=이름, K열(10번)=실결제금액, M열(12번)=장학생
+      // 헤더 행에서 열 위치 동적으로 찾기
+      const findColIdx = (rows, keyword) => {
+        if (!rows || rows.length === 0) return -1;
+        const header = rows[0];
+        for (let i = 0; i < header.length; i++) {
+          if (String(header[i] || "").trim().replace(/^"|"$/g, '').includes(keyword)) return i;
+        }
+        return -1;
+      };
+
       const scholarAmounts = {};
-      pay8?.forEach(r => {
+
+      // 8층결제표 헤더에서 열 위치 찾기
+      const amt8Col = findColIdx(pay8, "실 결제금액") !== -1 ? findColIdx(pay8, "실 결제금액") : findColIdx(pay8, "실결제금액");
+      const scholar8Col = findColIdx(pay8, "비고") !== -1 ? findColIdx(pay8, "비고") : findColIdx(pay8, "장학생");
+      console.log("8층 실결제금액 열:", amt8Col, "장학생 열:", scholar8Col);
+
+      pay8?.slice(1).forEach(r => {
         const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
-        const m = String(r[12] || "").trim().replace(/^"|"$/g, '');
-        const amt = Number(String(r[10] || "0").replace(/[^0-9.-]/g, '')) || 0;
-        if (name && name !== "학생이름" && name !== "이름" && m.includes("장학생")) {
+        const memo = String(r[scholar8Col] || "").trim().replace(/^"|"$/g, '');
+        const amt = Number(String(r[amt8Col] || "0").replace(/[^0-9.-]/g, '')) || 0;
+        if (name && name !== "학생이름" && name !== "이름" && name !== "-" && memo.includes("장학생")) {
           const norm = normalizeName(name);
           scholars.add(norm);
           scholarAmounts[norm] = amt;
-          console.log("8층 장학생:", name, "실결제금액:", amt);
+          console.log("8층 장학생:", name, "→", norm, "금액:", amt);
         }
       });
-      // 7층결제표: A열(0번)=이름, K열(10번)=실결제금액, N열(13번)=비고(장학생10%)
-      pay7?.forEach(r => {
+
+      // 7층결제표 헤더에서 열 위치 찾기
+      const amt7Col = findColIdx(pay7, "실 결제금액") !== -1 ? findColIdx(pay7, "실 결제금액") : findColIdx(pay7, "실결제금액");
+      const scholar7Col = findColIdx(pay7, "비고");
+      console.log("7층 실결제금액 열:", amt7Col, "비고 열:", scholar7Col);
+
+      pay7?.slice(1).forEach(r => {
         const name = String(r[0] || "").trim().replace(/^"|"$/g, '');
-        const n = String(r[13] || "").trim().replace(/^"|"$/g, '');
-        const amt = Number(String(r[10] || "0").replace(/[^0-9.-]/g, '')) || 0;
-        if (name && name !== "학생이름" && name !== "이름" && n.includes("장학생")) {
+        const memo = String(r[scholar7Col] || "").trim().replace(/^"|"$/g, '');
+        const amt = Number(String(r[amt7Col] || "0").replace(/[^0-9.-]/g, '')) || 0;
+        if (name && name !== "학생이름" && name !== "이름" && name !== "-" && memo.includes("장학생")) {
           const norm = normalizeName(name);
           scholars.add(norm);
           scholarAmounts[norm] = amt;
-          console.log("7층 장학생:", name, "실결제금액:", amt);
+          console.log("7층 장학생:", name, "→", norm, "금액:", amt);
         }
       });
       // 장학생 실납부액 = 실결제금액 × 90% 합산
