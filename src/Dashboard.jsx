@@ -247,13 +247,9 @@ export default function App() {
   const [scholarTotal, setScholarTotal] = useState(0);
   const [editAmounts, setEditAmounts] = useState({});
   const [resetting, setResetting] = useState(false);
-  const [bankWb, setBankWb] = useState(null);
-  const [bankRows, setBankRows] = useState([]);
-  const bankRef = useRef(null);
-  const [bankMatches, setBankMatches] = useState([]);
-  const [bankData, setBankData] = useState([]);
   const [pastMonths, setPastMonths] = useState([]);
-  const [selectedMonth, setSelectedMonth] = useState(null);
+  const [bankRows, setBankRows] = useState([]);
+  const bankRef = useRef([]);
 
   // ── 구글시트 자동 로드 (명단 + 결제표 장학생 정보)
   useEffect(() => {
@@ -360,58 +356,6 @@ export default function App() {
     });
   }, []);
 
-  // ── 과거 월 목록 로드
-  useEffect(() => {
-    fetch(`${APPS_SCRIPT_URL}?action=getMonths`)
-      .then(r => r.json())
-      .then(d => setPastMonths(d.months || []))
-      .catch(() => {});
-  }, []);
-
-  // ── 월 리셋 함수
-  const handleReset = async () => {
-    if (!window.confirm("⚠️ 이번 달 영수증을 구글시트에 저장하고 Supabase를 초기화할까요?\n\n이 작업은 되돌릴 수 없어요!")) return;
-    setResetting(true);
-    try {
-      // 1. 현재 영수증 데이터 구글시트에 백업
-      const now = new Date();
-      const yearMonth = `${now.getFullYear()}_${String(now.getMonth()+1).padStart(2,'0')}`;
-      const res = await fetch(APPS_SCRIPT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({ action: "backup", yearMonth, receipts: receiptsRef.current })
-      });
-      const result = await res.json();
-      if (!result.success) throw new Error("구글시트 저장 실패");
-
-      // 2. Supabase 영수증 전체 삭제
-      const delRes = await fetch(`${SUPABASE_URL}/rest/v1/receipts?id=gte.0`, {
-        method: "DELETE",
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" }
-      });
-
-      // 3. 상태 초기화
-      setReceipts([]);
-      receiptsRef.current = [];
-      setData(null);
-      setOnlineWb(null);
-      onlineRef.current = null;
-      setPastMonths(prev => [yearMonth, ...prev.filter(m => m !== yearMonth)]);
-      alert(`✅ ${yearMonth.replace('_','년 ')}월 데이터가 구글시트에 저장됐어요!\n영수증 ${result.count}건 백업 완료\n\n새 달이 시작됐어요 🎉`);
-    } catch(e) {
-      alert("❌ 리셋 실패: " + e.message);
-    }
-    setResetting(false);
-  };
-
-  // ── 과거 월 영수증 조회
-  const loadPastMonth = async (yearMonth) => {
-    setSelectedMonth(yearMonth);
-    const res = await fetch(`${APPS_SCRIPT_URL}?action=getReceipts&yearMonth=${yearMonth}`);
-    const data = await res.json();
-    alert(`📋 ${yearMonth.replace('_','년 ')}월 영수증 ${data.receipts?.length || 0}건\n합계: ${(data.receipts||[]).reduce((s,r)=>s+Number(r.amount||0),0).toLocaleString()}원`);
-  };
-
   // ── Supabase에서 영수증 자동 로드
   useEffect(() => {
     setReceiptLoading(true);
@@ -446,25 +390,160 @@ export default function App() {
       }));
   }, []);
 
-  const handleOnline = (wb) => { onlineRef.current = wb; setOnlineWb(wb); processData(wb, sheet8Ref.current, sheet7Ref.current, receiptsRef.current); };
+  const processData = useCallback((owb, rows8, rows7, rcpts, bRows) => {
+    if (!owb || !rows8 || !rows7) return;
+    const online = parseOnline(owb);
+    const payAmountMap = payAmountMapRef.current || {};
+    const bankData = bRows || bankRef.current || [];
+    const bankMatched = new Set();
+    const bankAmountMap = {};
+    bankData.forEach(b => {
+      const norm = normalizeName(b.rawName);
+      bankMatched.add(norm);
+      bankAmountMap[norm] = (bankAmountMap[norm] || 0) + b.amount;
+    });
+    const off8Raw = parseSheetRows(rows8, "8층");
+    const off7Raw = parseSheetRows(rows7, "7층");
+    // 결제표 금액 매핑 (processData 안에서 처리)
+    const off8 = off8Raw.map(s => {
+      const name = s.이름;
+      const norm = name.match(/^([가-힣]+[0-9]*)/) ? name.match(/^([가-힣]+[0-9]*)/)[1] : name;
+      const base = norm.replace(/[0-9]+$/, '');
+      return { ...s, 결제금액: payAmountMap[norm] || payAmountMap[base] || 0 };
+    });
+    const off7 = off7Raw.map(s => {
+      const name = s.이름;
+      const norm = name.match(/^([가-힣]+[0-9]*)/) ? name.match(/^([가-힣]+[0-9]*)/)[1] : name;
+      const base = norm.replace(/[0-9]+$/, '');
+      return { ...s, 결제금액: payAmountMap[norm] || payAmountMap[base] || 0 };
+    });
+    const allOff = [...off8, ...off7];
+    const receipts = rcpts || [];
+
+    // ── 결제선생 납부 세트 (정규화된이름_전화끝4자리)
+    const onlinePaidSet = new Set(
+      online
+        .filter(o => o.전화 && o.전화.length >= 4)
+        .map(o => `${normalizeName(o.이름)}_${o.전화.slice(-4)}`)
+    );
+    // 이름만으로도 매칭 (전화번호 없는 경우 대비)
+    const onlineNameSet = new Set([
+      ...online.map(o => normalizeName(o.이름)),
+      ...online.map(o => baseNameOnly(o.이름)),
+    ]);
+
+    // ── 영수증앱 납부 세트 (이름 기준)
+    const receiptPaidSet = new Set(receipts.map(r => r.name?.trim()));
+
+    // 장학생 세트
+    const scholarSet = scholarSetRef.current;
+
+    // ── 납부여부 체크: 결제선생 OR 영수증앱 OR 장학생
+    const checkPaid = (s) => {
+      const normalName = normalizeName(s.이름);
+      const baseName = baseNameOnly(s.이름);
+
+      // 장학생은 현금결제 → 무조건 납부
+      if (scholarSet.has(normalName) || scholarSet.has(baseName)) return true;
+
+      // 결제선생 이름 매칭
+      const onlineMatch = onlineNameSet.has(normalName) || onlineNameSet.has(baseName);
+
+      // 영수증앱 이름 매칭
+      const receiptMatch = receiptPaidSet.has(normalName) || receiptPaidSet.has(baseName) || receiptPaidSet.has(s.이름);
+
+      return onlineMatch || receiptMatch;
+    };
+
+    const off8WithPaid = off8.map(s => ({ ...s, 납부여부: checkPaid(s) }));
+    const off7WithPaid = off7.map(s => ({ ...s, 납부여부: checkPaid(s) }));
+
+    const unpaid8 = off8WithPaid.filter(s => !s.납부여부);
+    const unpaid7 = off7WithPaid.filter(s => !s.납부여부);
+
+    // ── 온라인 미매칭 (명단에 없는 결제선생 건) - 이름으로만 비교
+    const allOffNameSet = new Set([
+      ...allOff.map(s => normalizeName(s.이름)),
+      ...allOff.map(s => baseNameOnly(s.이름)),
+    ]);
+    const unmatchedOnline = online.filter((o) => {
+      const norm = normalizeName(o.이름);
+      const base = baseNameOnly(o.이름);
+      return !allOffNameSet.has(norm) && !allOffNameSet.has(base);
+    });
+
+    // ── 정확한 수납 합계
+    const onlinePaid = online.reduce((s, o) => s + o.금액, 0);
+    const receiptTotal = receipts.reduce((s, r) => s + Number(r.amount || 0), 0);
+    const scholarPaid = scholarTotalRef.current;
+    const totalPaid = onlinePaid + receiptTotal + scholarPaid;
+
+    setData({
+      online, allOff: [...off8WithPaid, ...off7WithPaid],
+      off8: off8WithPaid, off7: off7WithPaid, unmatchedOnline,
+      stats: {
+        onlinePaid, receiptTotal, scholarPaid, total: totalPaid,
+        off8Paid: 0, off7Paid: 0,
+        bankTotal: Object.values(bankAmountMap).reduce((s,a)=>s+a,0),
+        bankCnt: Object.keys(bankAmountMap).length,
+        unpaidCnt: unpaid8.length + unpaid7.length,
+        unpaid8Cnt: unpaid8.length, unpaid7Cnt: unpaid7.length,
+        unpaidAmt: [...unpaid8, ...unpaid7].reduce((s, u) => s + (u.결제금액||0), 0),
+        students8: off8.length, students7: off7.length,
+        paid8Cnt: off8WithPaid.filter(s => s.납부여부).length,
+        paid7Cnt: off7WithPaid.filter(s => s.납부여부).length,
+      },
+      discountStats: {},
+    });
+    setTab("summary");
+  }, []);
+
+  const handleOnline = (wb) => { onlineRef.current = wb; setOnlineWb(wb); processData(wb, sheet8Ref.current, sheet7Ref.current, receiptsRef.current, bankRef.current); };
 
   const handleBank = (wb) => {
-    setBankWb(wb);
     const ws = wb.Sheets[wb.SheetNames[0]];
     const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-    // 헤더 행 찾기 (No, 거래일시 등)
     let dataStart = 0;
     raw.forEach((r, i) => { if (String(r[0]).trim() === "No") dataStart = i + 1; });
     const rows = raw.slice(dataStart).filter(r => {
       const income = Number(String(r[4]||"0").replace(/[^0-9.-]/g,''));
       return income > 0;
     }).map(r => ({
-      date: String(r[1]||"").substring(0,10).replace(/\./g,"-"),
+      date: String(r[1]||"").substring(0,10),
       rawName: String(r[2]||"").trim(),
       amount: Number(String(r[4]||"0").replace(/[^0-9.-]/g,'')),
     }));
     setBankRows(rows);
-    processData(onlineRef.current, sheet8Ref.current, sheet7Ref.current, receiptsRef.current, rows);
+    bankRef.current = rows;
+    if (onlineRef.current) {
+      processData(onlineRef.current, sheet8Ref.current, sheet7Ref.current, receiptsRef.current, rows);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!window.confirm("⚠️ 이번 달 영수증을 구글시트에 저장하고 Supabase를 초기화할까요?\n\n이 작업은 되돌릴 수 없어요!")) return;
+    setResetting(true);
+    try {
+      const now = new Date();
+      const yearMonth = `${now.getFullYear()}_${String(now.getMonth()+1).padStart(2,'0')}`;
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "backup", yearMonth, receipts: receiptsRef.current })
+      });
+      const result = await res.json();
+      if (!result.success) throw new Error("구글시트 저장 실패");
+      await fetch(`${SUPABASE_URL}/rest/v1/receipts?id=gte.0`, {
+        method: "DELETE",
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" }
+      });
+      setReceipts([]); receiptsRef.current = [];
+      setData(null); setOnlineWb(null); onlineRef.current = null;
+      setBankRows([]); bankRef.current = [];
+      setPastMonths(prev => [yearMonth, ...prev.filter(m => m !== yearMonth)]);
+      alert(`✅ ${yearMonth.replace('_','년 ')}월 데이터 저장 완료!\n영수증 ${result.count}건 백업\n\n새 달이 시작됐어요 🎉`);
+    } catch(e) { alert("❌ 리셋 실패: " + e.message); }
+    setResetting(false);
   };
 
   const filteredStudents = data?.allOff.filter((s) => {
@@ -555,12 +634,12 @@ export default function App() {
         </div>
         <button onClick={() => { setData(null); setOnlineWb(null); setWb8(null); setWb7(null); }}
           style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.textSub, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>🔄 새로 불러오기</button>
-        <button onClick={() => { setOnlineWb(null); onlineRef.current = null; setData(null); }} style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.textSub, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500, marginLeft: 8 }}>🏠 홈으로</button>
+        <button onClick={() => { setOnlineWb(null); onlineRef.current = null; setData(null); setBankRows([]); bankRef.current = []; }} style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.textSub, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500, marginLeft: 8 }}>🏠 홈으로</button>
         <button onClick={handleReset} disabled={resetting} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #ef4444", background: "transparent", color: "#ef4444", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, marginLeft: 8 }}>
           {resetting ? "⏳ 저장 중..." : "🔄 월 마감·리셋"}
         </button>
         {pastMonths.length > 0 && (
-          <select onChange={e => e.target.value && loadPastMonth(e.target.value)} value="" style={{ marginLeft: 8, padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.textSub, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+          <select onChange={e => { if(!e.target.value) return; const ym=e.target.value; fetch(`${APPS_SCRIPT_URL}?action=getReceipts&yearMonth=${ym}`).then(r=>r.json()).then(d=>alert(`📋 ${ym.replace('_','년 ')}월\n${d.receipts?.length||0}건 · ${(d.receipts||[]).reduce((s,r)=>s+Number(r.amount||0),0).toLocaleString()}원`)); }} value="" style={{ marginLeft: 8, padding: "8px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.textSub, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
             <option value="">📂 과거 기록</option>
             {pastMonths.map(m => <option key={m} value={m}>{m.replace('_','년 ')}월</option>)}
           </select>
