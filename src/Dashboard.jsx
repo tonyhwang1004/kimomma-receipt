@@ -255,6 +255,9 @@ export default function App() {
   const [showOnlineModal, setShowOnlineModal] = useState(false);
   const [showUnpaidModal, setShowUnpaidModal] = useState(false);
   const [excludedUnpaid, setExcludedUnpaid] = useState(new Set());
+  const [searchOnline, setSearchOnline] = useState("");
+  const [searchReceipt, setSearchReceipt] = useState("");
+  const [searchBank, setSearchBank] = useState("");
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showScholarModal, setShowScholarModal] = useState(false);
   const [excludedOnline, setExcludedOnline] = useState(new Set());
@@ -463,7 +466,10 @@ export default function App() {
       // 영수증앱 이름 매칭
       const receiptMatch = receiptPaidSet.has(normalName) || receiptPaidSet.has(baseName) || receiptPaidSet.has(s.이름);
 
-      return onlineMatch || receiptMatch;
+      // 계좌이체 매칭
+      const bankMatch = bankMatched.has(normalName) || bankMatched.has(baseName);
+
+      return onlineMatch || receiptMatch || bankMatch;
     };
 
     const off8WithPaid = off8.map(s => ({ ...s, 납부여부: checkPaid(s) }));
@@ -648,8 +654,8 @@ export default function App() {
 
   const OnlineModal = () => {
     if (!showOnlineModal) return null;
-    const rows = data.online.filter(o => !excludedOnline.has(o.이름+o.금액));
-    const excluded = data.online.length - rows.length;
+    const rows = data.online.filter(o => !excludedOnline.has(o.이름+o.금액) && o.이름.includes(searchOnline));
+    const excluded = data.online.length - data.online.filter(o => !excludedOnline.has(o.이름+o.금액)).length;
     return (
       <div onClick={() => setShowOnlineModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
         <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
@@ -658,8 +664,9 @@ export default function App() {
               <div style={{ fontWeight:800, fontSize:20 }}>💳 결제선생 상세 내역</div>
               <div style={{ fontSize:13, color:"#6b7280", marginTop:4 }}>총 {rows.length}건 · {excluded>0 && <span style={{color:"#ef4444"}}>제외 {excluded}건 · </span>}합계 {rows.reduce((s,o)=>s+o.금액,0).toLocaleString()}원</div>
             </div>
-            <button onClick={()=>setShowOnlineModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
+            <button onClick={()=>{setShowOnlineModal(false);setSearchOnline("");}} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
           </div>
+          <SearchBox value={searchOnline} onChange={setSearchOnline} />
           <div style={{ display:"grid", gap:8 }}>
             {rows.map((o,i) => (
               <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px 110px 44px", gap:12, alignItems:"center", padding:"12px 16px", background:"#eff6ff", borderRadius:12, border:"1px solid #bfdbfe" }}>
@@ -706,10 +713,11 @@ export default function App() {
               <div style={{ fontWeight:800, fontSize:20 }}>🧾 영수증앱 상세 내역</div>
               <div style={{ fontSize:13, color:"#6b7280", marginTop:4 }}>총 {receipts.length}건 · 합계 {data.stats.receiptTotal.toLocaleString()}원</div>
             </div>
-            <button onClick={()=>setShowReceiptModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
+            <button onClick={()=>{setShowReceiptModal(false);setSearchReceipt("");}} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
           </div>
+          <SearchBox value={searchReceipt} onChange={setSearchReceipt} />
           <div style={{ display:"grid", gap:8 }}>
-            {receipts.map((r,i) => (
+            {receipts.filter(r => r.name.includes(searchReceipt)).map((r,i) => (
               <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px 110px", gap:12, alignItems:"center", padding:"12px 16px", background:"#fffbeb", borderRadius:12, border:"1px solid #fde68a" }}>
                 <div style={{ fontWeight:700, fontSize:15 }}>{r.name}</div>
                 <div style={{ fontWeight:700, fontSize:15, color:"#f59e0b", textAlign:"right" }}>{Number(r.amount).toLocaleString()}원</div>
@@ -766,6 +774,16 @@ export default function App() {
       </div>
     );
   };
+
+  const SearchBox = ({ value, onChange }) => (
+    <input
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder="🔍 이름 검색..."
+      style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"1px solid #e5e7eb", fontSize:14, marginBottom:16, boxSizing:"border-box", outline:"none" }}
+      onClick={e => e.stopPropagation()}
+    />
+  );
 
   const BankModal = () => {
     if (!showBankModal) return null;
