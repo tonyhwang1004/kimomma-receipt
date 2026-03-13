@@ -665,7 +665,7 @@ export default function App() {
             </div>
             <button onClick={()=>{setShowOnlineModal(false);setSearchOnline("");}} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
           </div>
-          <input value={searchOnline} onChange={e => setSearchOnline(e.target.value)} placeholder="🔍 이름 검색..." style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #6366f1", fontSize:15, marginBottom:16, boxSizing:"border-box", outline:"none" }} />
+          <input defaultValue="" onInput={e => setSearchOnline(e.target.value)} placeholder="🔍 이름 검색..." style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #6366f1", fontSize:15, marginBottom:16, boxSizing:"border-box", outline:"none" }} />
           <div style={{ display:"grid", gap:8 }}>
             {rows.map((o,i) => (
               <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px 110px 44px", gap:12, alignItems:"center", padding:"12px 16px", background:"#eff6ff", borderRadius:12, border:"1px solid #bfdbfe" }}>
@@ -714,7 +714,7 @@ export default function App() {
             </div>
             <button onClick={()=>{setShowReceiptModal(false);setSearchReceipt("");}} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
           </div>
-          <input value={searchReceipt} onChange={e => setSearchReceipt(e.target.value)} placeholder="🔍 이름 검색..." style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #6366f1", fontSize:15, marginBottom:16, boxSizing:"border-box", outline:"none" }} />
+          <input defaultValue="" onInput={e => setSearchReceipt(e.target.value)} placeholder="🔍 이름 검색..." style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #6366f1", fontSize:15, marginBottom:16, boxSizing:"border-box", outline:"none" }} />
           <div style={{ display:"grid", gap:8 }}>
             {receipts.filter(r => r.name.includes(searchReceipt)).map((r,i) => (
               <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px 110px", gap:12, alignItems:"center", padding:"12px 16px", background:"#fffbeb", borderRadius:12, border:"1px solid #fde68a" }}>
@@ -768,7 +768,7 @@ export default function App() {
             </div>
             <button onClick={() => {setShowBankModal(false);setSearchBank("");}} style={{ border: "none", background: "#f3f4f6", borderRadius: 10, width: 36, height: 36, fontSize: 18, cursor: "pointer" }}>✕</button>
           </div>
-          <input value={searchBank} onChange={e => setSearchBank(e.target.value)} placeholder="🔍 이름 검색..." style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #6366f1", fontSize:15, marginBottom:16, boxSizing:"border-box", outline:"none" }} />
+          <input defaultValue="" onInput={e => setSearchBank(e.target.value)} placeholder="🔍 이름 검색..." style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #6366f1", fontSize:15, marginBottom:16, boxSizing:"border-box", outline:"none" }} />
           <div style={{ display: "grid", gap: 8 }}>
             {rows.map((r, i) => (
               <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 130px 110px 44px", gap: 12, alignItems: "center", padding: "12px 16px", background: "#f0fdf4", borderRadius: 12, border: "1px solid #bbf7d0" }}>
