@@ -249,12 +249,9 @@ export default function App() {
   const [resetting, setResetting] = useState(false);
   const [bankWb, setBankWb] = useState(null);
   const [bankRows, setBankRows] = useState([]);
-  const [bankWb, setBankWb] = useState(null);
   const bankRef = useRef(null);
   const [bankMatches, setBankMatches] = useState([]);
-  const [bankWb, setBankWb] = useState(null);
   const [bankData, setBankData] = useState([]);
-  const bankRef = useRef([]);
   const [pastMonths, setPastMonths] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(null);
 
@@ -449,186 +446,6 @@ export default function App() {
       }));
   }, []);
 
-  // ── 계좌이체 파싱
-  const parseBank = useCallback((wb) => {
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-    // 헤더 찾기 (No가 있는 행)
-    let headerRow = -1;
-    rows.forEach((r, i) => { if (String(r[0]).trim() === "No") headerRow = i; });
-    if (headerRow < 0) return [];
-    const allStudents = [
-      ...(sheet8Ref.current||[]).map(r => String(r[0]||"").trim().replace(/^"|"$/g,'')),
-      ...(sheet7Ref.current||[]).map(r => String(r[0]||"").trim().replace(/^"|"$/g,'')),
-    ].filter(n => n && n !== "이름" && n !== "학생이름" && n !== "-");
-
-    const results = [];
-    rows.slice(headerRow + 1).forEach(r => {
-      const rawName = String(r[2]||"").trim();
-      const inAmt = Number(String(r[4]||"0").replace(/[^0-9]/g,'')) || 0;
-      const date = String(r[1]||"").substring(0, 10);
-      if (inAmt <= 0) return; // 출금 제외
-      // 학생 이름 매칭: 이름이 rawName 안에 포함되어 있으면 매칭
-      const matched = allStudents.find(name => {
-        if (!name || name.length < 2) return false;
-        const norm = normalizeName(name);
-        const rawNorm = normalizeName(rawName);
-        return rawNorm.includes(norm) || norm.includes(rawNorm);
-      });
-      results.push({ rawName, date, amount: inAmt, matched: matched || null });
-    });
-    return results;
-  }, []);
-
-  const handleBank = useCallback((wb) => {
-    bankRef.current = wb;
-    setBankWb(wb);
-    const matches = parseBank(wb);
-    setBankMatches(matches);
-  }, [parseBank]);
-
-  const processData = useCallback((owb, rows8, rows7, rcpts, bRows) => {
-    if (!owb || !rows8 || !rows7) return;
-    const online = parseOnline(owb);
-    const payAmountMap = payAmountMapRef.current || {};
-    const bankData = bRows || [];
-    // 계좌이체 매칭: 이름 정규화 후 학생 명단과 비교
-    const bankMatched = new Set();
-    const bankAmountMap = {};
-    bankData.forEach(b => {
-      const norm = normalizeName(b.rawName);
-      bankMatched.add(norm);
-      bankAmountMap[norm] = (bankAmountMap[norm] || 0) + b.amount;
-    });
-    const bankNames = new Set(bankRef.current.map(b => normalizeName(b.name)));
-    const bankTotal = bankRef.current.reduce((s, b) => s + b.amount, 0);
-    const off8Raw = parseSheetRows(rows8, "8층");
-    const off7Raw = parseSheetRows(rows7, "7층");
-    // 결제표 금액 매핑 (processData 안에서 처리)
-    const off8 = off8Raw.map(s => {
-      const name = s.이름;
-      const norm = name.match(/^([가-힣]+[0-9]*)/) ? name.match(/^([가-힣]+[0-9]*)/)[1] : name;
-      const base = norm.replace(/[0-9]+$/, '');
-      return { ...s, 결제금액: payAmountMap[norm] || payAmountMap[base] || 0 };
-    });
-    const off7 = off7Raw.map(s => {
-      const name = s.이름;
-      const norm = name.match(/^([가-힣]+[0-9]*)/) ? name.match(/^([가-힣]+[0-9]*)/)[1] : name;
-      const base = norm.replace(/[0-9]+$/, '');
-      return { ...s, 결제금액: payAmountMap[norm] || payAmountMap[base] || 0 };
-    });
-    const allOff = [...off8, ...off7];
-    const receipts = rcpts || [];
-
-    // ── 결제선생 납부 세트 (정규화된이름_전화끝4자리)
-    const onlinePaidSet = new Set(
-      online
-        .filter(o => o.전화 && o.전화.length >= 4)
-        .map(o => `${normalizeName(o.이름)}_${o.전화.slice(-4)}`)
-    );
-    // 이름만으로도 매칭 (전화번호 없는 경우 대비)
-    const onlineNameSet = new Set([
-      ...online.map(o => normalizeName(o.이름)),
-      ...online.map(o => baseNameOnly(o.이름)),
-    ]);
-
-    // ── 영수증앱 납부 세트 (이름 기준)
-    const receiptPaidSet = new Set(receipts.map(r => r.name?.trim()));
-
-    // 장학생 세트
-    const scholarSet = scholarSetRef.current;
-
-    // ── 납부여부 체크: 결제선생 OR 영수증앱 OR 장학생
-    const checkPaid = (s) => {
-      const normalName = normalizeName(s.이름);
-      const baseName = baseNameOnly(s.이름);
-
-      // 장학생은 현금결제 → 무조건 납부
-      if (scholarSet.has(normalName) || scholarSet.has(baseName)) return true;
-
-      // 결제선생 이름 매칭
-      const onlineMatch = onlineNameSet.has(normalName) || onlineNameSet.has(baseName);
-
-      // 영수증앱 이름 매칭
-      const receiptMatch = receiptPaidSet.has(normalName) || receiptPaidSet.has(baseName) || receiptPaidSet.has(s.이름);
-
-      return onlineMatch || receiptMatch;
-    };
-
-    const off8WithPaid = off8.map(s => ({ ...s, 납부여부: checkPaid(s) }));
-    const off7WithPaid = off7.map(s => ({ ...s, 납부여부: checkPaid(s) }));
-
-    const unpaid8 = off8WithPaid.filter(s => !s.납부여부);
-    const unpaid7 = off7WithPaid.filter(s => !s.납부여부);
-
-    // ── 온라인 미매칭 (명단에 없는 결제선생 건) - 이름으로만 비교
-    const allOffNameSet = new Set([
-      ...allOff.map(s => normalizeName(s.이름)),
-      ...allOff.map(s => baseNameOnly(s.이름)),
-    ]);
-    const unmatchedOnline = online.filter((o) => {
-      const norm = normalizeName(o.이름);
-      const base = baseNameOnly(o.이름);
-      return !allOffNameSet.has(norm) && !allOffNameSet.has(base);
-    });
-
-    // ── 정확한 수납 합계
-    const onlinePaid = online.reduce((s, o) => s + o.금액, 0);
-    const receiptTotal = receipts.reduce((s, r) => s + Number(r.amount || 0), 0);
-    const scholarPaid = scholarTotalRef.current;
-    const totalPaid = onlinePaid + receiptTotal + scholarPaid;
-
-    setData({
-      online, allOff: [...off8WithPaid, ...off7WithPaid],
-      off8: off8WithPaid, off7: off7WithPaid, unmatchedOnline,
-      stats: {
-        onlinePaid, receiptTotal, scholarPaid, total: totalPaid,
-        off8Paid: 0, off7Paid: 0,
-        bankTotal: Object.values(bankAmountMap).reduce((s,a)=>s+a,0),
-        bankCnt: Object.keys(bankAmountMap).length,
-        unpaidCnt: unpaid8.length + unpaid7.length,
-        unpaid8Cnt: unpaid8.length, unpaid7Cnt: unpaid7.length,
-        unpaidAmt: [...unpaid8, ...unpaid7].reduce((s, u) => s + (u.결제금액||0), 0),
-        bankTotal,
-        bankTotal: bankRef.current.reduce((s, b) => s + b.amount, 0),
-        bankCnt: bankRef.current.length,
-        students8: off8.length, students7: off7.length,
-        paid8Cnt: off8WithPaid.filter(s => s.납부여부).length,
-        paid7Cnt: off7WithPaid.filter(s => s.납부여부).length,
-      },
-      discountStats: {},
-    });
-    setTab("summary");
-  }, []);
-
-  const handleBank = (wb) => {
-    setBankWb(wb);
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-    // 헤더 행 찾기 (No, 거래일시, 보낸분/받는분...)
-    let headerRow = -1;
-    rows.forEach((r, i) => {
-      if (String(r[0]).includes("No") && String(r[1]).includes("거래")) headerRow = i;
-    });
-    if (headerRow < 0) { alert("계좌이체 파일 형식이 맞지 않아요!"); return; }
-    const data = [];
-    for (let i = headerRow + 1; i < rows.length; i++) {
-      const r = rows[i];
-      const name = String(r[2]||"").trim();
-      const income = Number(String(r[4]||"0").replace(/[^0-9]/g, "")) || 0;
-      const date = String(r[1]||"").substring(0, 10);
-      if (income > 0 && name) {
-        data.push({ name, amount: income, date, raw: name });
-      }
-    }
-    bankRef.current = data;
-    setBankData(data);
-    processData(onlineRef.current, sheet8Ref.current, sheet7Ref.current, receiptsRef.current);
-    console.log("계좌이체 입금:", data.length, "건");
-  };
-
-  const handleOnline = (wb) => { onlineRef.current = wb; setOnlineWb(wb); processData(wb, sheet8Ref.current, sheet7Ref.current, receiptsRef.current); };
-
   const handleBank = (wb) => {
     setBankWb(wb);
     const ws = wb.Sheets[wb.SheetNames[0]];
@@ -704,7 +521,6 @@ export default function App() {
             <div style={{ display: "grid", gap: 12 }}>
               <DropZone label="결제선생 xlsx 업로드" icon="💳" onFile={handleOnline} loaded={!!onlineWb} />
               <DropZone label="계좌이체 xls 업로드" icon="🏦" onFile={handleBank} loaded={bankRows.length > 0} />
-              <DropZone label="계좌이체 xls 업로드" icon="🏦" onFile={handleBank} loaded={bankData.length > 0} />
             </div>
           </div>
           <p style={{ textAlign: "center", color: C.textMuted, fontSize: 12, marginTop: 20 }}>학생 명단 · 영수증 앱 데이터는 자동으로 불러옵니다 ☁️</p>
@@ -767,9 +583,7 @@ export default function App() {
               <StatCard icon="💳" label="결제선생 (온라인)" value={money(data.stats.onlinePaid)} sub={`${data.online.length}건 · 카드/간편결제`} color={C.blue} glow />
               <StatCard icon="🧾" label="영수증앱 (오프라인)" value={money(data.stats.receiptTotal)} sub={`${receipts.length}건 · 현장 현금 등`} color={C.warning} glow />
               <StatCard icon="🎓" label="장학생 납부 (현금·90%)" value={money(data.stats.scholarPaid)} sub={`${scholarCount}명 · 할인 10% 적용`} color="#f59e0b" glow />
-              {data.stats.bankCnt > 0 && <StatCard icon="🏦" label="계좌이체" value={money(data.stats.bankTotal)} sub={`${data.stats.bankCnt}건 · 입금 내역`} color={C.green} />}
-              <StatCard icon="🏦" label="계좌이체" value={money(data.stats.bankTotal||0)} sub={`${bankMatches.filter(m=>m.matched).length}건 매칭`} color="#10b981" />
-              {data.stats.bankCnt > 0 && <StatCard icon="🏦" label="계좌이체" value={money(data.stats.bankTotal)} sub={`${data.stats.bankCnt}건 · 입금 확인`} color={C.green||"#22c55e"} />}
+              {data.stats.bankCnt > 0 && <StatCard icon="🏦" label="계좌이체" value={money(data.stats.bankTotal)} sub={`${data.stats.bankCnt}건 · 입금 확인`} color="#10b981" />}
               <StatCard icon="⚠️" label="미납 학생" value={`${data.stats.unpaidCnt}명`} sub={`추정 미수금 ${money(data.stats.unpaidAmt)}`} color={C.danger} />
             </div>
 
