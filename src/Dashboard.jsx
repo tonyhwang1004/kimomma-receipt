@@ -244,6 +244,7 @@ export default function App() {
   const pay7Ref = useRef(null);
   const [scholarCount, setScholarCount] = useState(0);
   const [scholarList, setScholarList] = useState([]);
+  const scholarAmountsRef = useRef({});
   const [scholarTotal, setScholarTotal] = useState(0);
   const [editAmounts, setEditAmounts] = useState({});
   const [resetting, setResetting] = useState(false);
@@ -325,13 +326,15 @@ export default function App() {
       // 7층 장학생도 미납 제외를 위해 scholars에는 추가
       pay7ScholarNames.forEach(n => scholars.add(n));
       scanScholar(pay7, "7층");
-      // 장학생 실납부액 = 8층만 현금결제 × 90% 합산 (7층은 카드결제로 결제선생에 포함)
+      // 장학생 실납부액 = 8층만 현금결제 × 90% 합산 (계좌이체로 납부한 장학생 제외)
+      const bankNorms = new Set((bRows||bankRef.current||[]).map(b => normalizeName(b.rawName)));
       const scholarTotal = Object.entries(scholarAmounts)
-        .filter(([name]) => !pay7ScholarNames.has(name))
+        .filter(([name]) => !pay7ScholarNames.has(name) && !bankNorms.has(name))
         .reduce((s, [, a]) => s + Math.round(a * 0.9), 0);
       console.log("장학생 실납부액 합계:", scholarTotal);
       scholarSetRef.current = scholars;
       scholarTotalRef.current = scholarTotal;
+      scholarAmountsRef.current = scholarAmounts;
       // 결제표 금액 맵 생성
       // 8층: I열(8번)=결제금액, 7층: J열(9번)=결제금액
       payAmountMapRef.current = {};
@@ -659,7 +662,7 @@ export default function App() {
             {scholarList.map((name,i) => (
               <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px", gap:12, alignItems:"center", padding:"12px 16px", background:"#fffbeb", borderRadius:12, border:"1px solid #fde68a" }}>
                 <div style={{ fontWeight:700, fontSize:15 }}>🎓 {name}</div>
-                <div style={{ fontWeight:700, fontSize:15, color:"#f59e0b", textAlign:"right" }}>{scholarAmounts?.[name] ? (Math.round(scholarAmounts[name]*0.9)).toLocaleString()+"원" : "-"}</div>
+                <div style={{ fontWeight:700, fontSize:15, color:"#f59e0b", textAlign:"right" }}>{scholarAmountsRef.current?.[name] ? (Math.round(scholarAmountsRef.current[name]*0.9)).toLocaleString()+"원" : "-"}</div>
               </div>
             ))}
           </div>
