@@ -498,7 +498,14 @@ export default function App() {
     setTab("summary");
   }, []);
 
-  const handleOnline = (wb) => { onlineRef.current = wb; setOnlineWb(wb); processData(wb, sheet8Ref.current, sheet7Ref.current, receiptsRef.current, bankRef.current); };
+  const handleOnline = (wb) => {
+    onlineRef.current = wb;
+    setOnlineWb(wb);
+    // 계좌이체도 올라와 있을 때만 대시보드로 넘어감
+    if (bankRef.current && bankRef.current.length > 0) {
+      processData(wb, sheet8Ref.current, sheet7Ref.current, receiptsRef.current, bankRef.current);
+    }
+  };
 
   const handleBank = (wb) => {
     const ws = wb.Sheets[wb.SheetNames[0]];
@@ -556,8 +563,8 @@ export default function App() {
   // ── 업로드 화면
   // 구글시트 로드되고 결제선생 올리면 자동 실행
   useEffect(() => {
-    if (onlineWb && sheet8Rows && sheet7Rows) {
-      processData(onlineWb, sheet8Rows, sheet7Rows, receiptsRef.current);
+    if (onlineWb && sheet8Rows && sheet7Rows && bankRef.current.length > 0) {
+      processData(onlineWb, sheet8Rows, sheet7Rows, receiptsRef.current, bankRef.current);
     }
   }, [sheet8Rows, sheet7Rows]);
 
