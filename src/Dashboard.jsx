@@ -615,6 +615,26 @@ export default function App() {
             ))}
           </div>
           {excluded>0 && <button onClick={()=>setExcludedOnline(new Set())} style={{ marginTop:16, padding:"8px 16px", borderRadius:10, border:"1px solid #d1d5db", background:"transparent", color:"#6b7280", fontSize:13, cursor:"pointer" }}>🔄 제외 항목 복원</button>}
+          {(() => {
+            const paidNames = new Set(rows.map(o => normalizeName(o.이름)));
+            const unpaid = data.allOff.filter(s => !s.납부여부);
+            const notInOnline = unpaid.filter(s => !paidNames.has(normalizeName(s.이름)));
+            if (notInOnline.length === 0) return null;
+            return (
+              <div style={{ marginTop:24 }}>
+                <div style={{ fontWeight:700, color:"#ef4444", fontSize:15, marginBottom:12 }}>⚠️ 결제선생 미포함 학생 ({notInOnline.length}명)</div>
+                <div style={{ display:"grid", gap:6 }}>
+                  {notInOnline.map((s,i) => (
+                    <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 80px 130px", gap:12, alignItems:"center", padding:"10px 14px", background:"#fef2f2", borderRadius:10, border:"1px solid #fecaca", fontSize:14 }}>
+                      <div style={{ fontWeight:700 }}>{s.이름} <span style={{ fontSize:11, color:"#9ca3af" }}>{s.층} · {s.좌석유형}</span></div>
+                      <div style={{ fontSize:12, color:"#9ca3af" }}>{s.전화||""}</div>
+                      <div style={{ fontWeight:700, color:"#ef4444", textAlign:"right" }}>{(payAmountMapRef.current[normalizeName(s.이름)]||0).toLocaleString()}원</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
@@ -641,6 +661,26 @@ export default function App() {
               </div>
             ))}
           </div>
+          {(() => {
+            const paidNames = new Set(receipts.map(r => normalizeName(r.name)));
+            const unpaid = data.allOff.filter(s => !s.납부여부);
+            const notInReceipt = unpaid.filter(s => !paidNames.has(normalizeName(s.이름)));
+            if (notInReceipt.length === 0) return null;
+            return (
+              <div style={{ marginTop:24 }}>
+                <div style={{ fontWeight:700, color:"#ef4444", fontSize:15, marginBottom:12 }}>⚠️ 영수증 미발행 학생 ({notInReceipt.length}명)</div>
+                <div style={{ display:"grid", gap:6 }}>
+                  {notInReceipt.map((s,i) => (
+                    <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 80px 130px", gap:12, alignItems:"center", padding:"10px 14px", background:"#fef2f2", borderRadius:10, border:"1px solid #fecaca", fontSize:14 }}>
+                      <div style={{ fontWeight:700 }}>{s.이름} <span style={{ fontSize:11, color:"#9ca3af" }}>{s.층} · {s.좌석유형}</span></div>
+                      <div style={{ fontSize:12, color:"#9ca3af" }}>{s.전화||""}</div>
+                      <div style={{ fontWeight:700, color:"#ef4444", textAlign:"right" }}>{(payAmountMapRef.current[normalizeName(s.이름)]||0).toLocaleString()}원</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
