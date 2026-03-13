@@ -251,6 +251,10 @@ export default function App() {
   const [bankRows, setBankRows] = useState([]);
   const [showBankModal, setShowBankModal] = useState(false);
   const [excludedBank, setExcludedBank] = useState(new Set());
+  const [showOnlineModal, setShowOnlineModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [showScholarModal, setShowScholarModal] = useState(false);
+  const [excludedOnline, setExcludedOnline] = useState(new Set());
   const bankRef = useRef([]);
 
   // ── 구글시트 자동 로드 (명단 + 결제표 장학생 정보)
@@ -583,6 +587,87 @@ export default function App() {
     }
   }, [sheet8Rows, sheet7Rows]);
 
+  const OnlineModal = () => {
+    if (!showOnlineModal) return null;
+    const rows = data.online.filter(o => !excludedOnline.has(o.이름+o.금액));
+    const excluded = data.online.length - rows.length;
+    return (
+      <div onClick={() => setShowOnlineModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+            <div>
+              <div style={{ fontWeight:800, fontSize:20 }}>💳 결제선생 상세 내역</div>
+              <div style={{ fontSize:13, color:"#6b7280", marginTop:4 }}>총 {rows.length}건 · {excluded>0 && <span style={{color:"#ef4444"}}>제외 {excluded}건 · </span>}합계 {rows.reduce((s,o)=>s+o.금액,0).toLocaleString()}원</div>
+            </div>
+            <button onClick={()=>setShowOnlineModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
+          </div>
+          <div style={{ display:"grid", gap:8 }}>
+            {rows.map((o,i) => (
+              <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px 110px 44px", gap:12, alignItems:"center", padding:"12px 16px", background:"#eff6ff", borderRadius:12, border:"1px solid #bfdbfe" }}>
+                <div style={{ fontWeight:700, fontSize:15 }}>{o.이름}</div>
+                <div style={{ fontWeight:700, fontSize:15, color:"#3b82f6", textAlign:"right" }}>{o.금액.toLocaleString()}원</div>
+                <div style={{ fontSize:12, color:"#9ca3af", textAlign:"right" }}>{o.결제일||""}</div>
+                <button onClick={()=>setExcludedOnline(prev=>{const s=new Set(prev);s.add(o.이름+o.금액);return s;})} style={{ background:"#fee2e2", border:"none", borderRadius:8, width:36, height:36, cursor:"pointer", fontSize:16 }}>🗑</button>
+              </div>
+            ))}
+          </div>
+          {excluded>0 && <button onClick={()=>setExcludedOnline(new Set())} style={{ marginTop:16, padding:"8px 16px", borderRadius:10, border:"1px solid #d1d5db", background:"transparent", color:"#6b7280", fontSize:13, cursor:"pointer" }}>🔄 제외 항목 복원</button>}
+        </div>
+      </div>
+    );
+  };
+
+  const ReceiptModal = () => {
+    if (!showReceiptModal) return null;
+    return (
+      <div onClick={() => setShowReceiptModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+            <div>
+              <div style={{ fontWeight:800, fontSize:20 }}>🧾 영수증앱 상세 내역</div>
+              <div style={{ fontSize:13, color:"#6b7280", marginTop:4 }}>총 {receipts.length}건 · 합계 {data.stats.receiptTotal.toLocaleString()}원</div>
+            </div>
+            <button onClick={()=>setShowReceiptModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
+          </div>
+          <div style={{ display:"grid", gap:8 }}>
+            {receipts.map((r,i) => (
+              <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px 110px", gap:12, alignItems:"center", padding:"12px 16px", background:"#fffbeb", borderRadius:12, border:"1px solid #fde68a" }}>
+                <div style={{ fontWeight:700, fontSize:15 }}>{r.name}</div>
+                <div style={{ fontWeight:700, fontSize:15, color:"#f59e0b", textAlign:"right" }}>{Number(r.amount).toLocaleString()}원</div>
+                <div style={{ fontSize:12, color:"#9ca3af", textAlign:"right" }}>{r.date||""}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const ScholarModal = () => {
+    if (!showScholarModal) return null;
+    return (
+      <div onClick={() => setShowScholarModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+            <div>
+              <div style={{ fontWeight:800, fontSize:20 }}>🎓 장학생 납부 내역</div>
+              <div style={{ fontSize:13, color:"#6b7280", marginTop:4 }}>{scholarCount}명 · 현금결제 90% 적용 · 합계 {data.stats.scholarPaid.toLocaleString()}원</div>
+            </div>
+            <button onClick={()=>setShowScholarModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
+          </div>
+          <div style={{ display:"grid", gap:8 }}>
+            {scholarList.map((name,i) => (
+              <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px", gap:12, alignItems:"center", padding:"12px 16px", background:"#fffbeb", borderRadius:12, border:"1px solid #fde68a" }}>
+                <div style={{ fontWeight:700, fontSize:15 }}>🎓 {name}</div>
+                <div style={{ fontWeight:700, fontSize:15, color:"#f59e0b", textAlign:"right" }}>{scholarAmounts?.[name] ? (Math.round(scholarAmounts[name]*0.9)).toLocaleString()+"원" : "-"}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const BankModal = () => {
     if (!showBankModal) return null;
     const rows = (data?.stats?.bankRows || []).filter(r => !excludedBank.has(r.rawName + r.date));
@@ -683,6 +768,9 @@ export default function App() {
 
   return (
     <>
+    <OnlineModal />
+    <ReceiptModal />
+    <ScholarModal />
     <BankModal />
     <div style={{ minHeight: "100dvh", background: C.bg, fontFamily: "'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif", color: C.text }}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -722,15 +810,21 @@ export default function App() {
             <div style={{ background: C.surface, borderRadius: 16, padding: "16px 20px", border: `2px solid ${C.primary}`, marginBottom: 20 }}>
               <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>✅ 정확한 전체 수납 합계 (결제선생 + 영수증앱 + 장학생 + 계좌이체)</div>
               <div style={{ fontSize: 32, fontWeight: 800, color: C.primary, letterSpacing: -1 }}>{money(
-                data.stats.onlinePaid + data.stats.receiptTotal + data.stats.scholarPaid +
+                data.online.filter(o=>!excludedOnline.has(o.이름+o.금액)).reduce((s,o)=>s+o.금액,0) + data.stats.receiptTotal + data.stats.scholarPaid +
                 (data.stats.bankRows||[]).filter(r => !excludedBank.has(r.rawName + r.date)).reduce((s,r)=>s+r.amount,0)
               )}</div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 28 }}>
-              <StatCard icon="💳" label="결제선생 (온라인)" value={money(data.stats.onlinePaid)} sub={`${data.online.length}건 · 카드/간편결제`} color={C.blue} glow />
-              <StatCard icon="🧾" label="영수증앱 (오프라인)" value={money(data.stats.receiptTotal)} sub={`${receipts.length}건 · 현장 현금 등`} color={C.warning} glow />
-              <StatCard icon="🎓" label="장학생 납부 (현금·90%)" value={money(data.stats.scholarPaid)} sub={`${scholarCount}명 · 할인 10% 적용`} color="#f59e0b" glow />
+              <div onClick={() => setShowOnlineModal(true)} style={{ cursor: "pointer" }}>
+                <StatCard icon="💳" label="결제선생 (온라인)" value={money(data.online.filter(o=>!excludedOnline.has(o.이름+o.금액)).reduce((s,o)=>s+o.금액,0))} sub={`${data.online.filter(o=>!excludedOnline.has(o.이름+o.금액)).length}건 · 클릭해서 상세보기`} color={C.blue} glow />
+              </div>
+              <div onClick={() => setShowReceiptModal(true)} style={{ cursor: "pointer" }}>
+                <StatCard icon="🧾" label="영수증앱 (오프라인)" value={money(data.stats.receiptTotal)} sub={`${receipts.length}건 · 클릭해서 상세보기`} color={C.warning} glow />
+              </div>
+              <div onClick={() => setShowScholarModal(true)} style={{ cursor: "pointer" }}>
+                <StatCard icon="🎓" label="장학생 납부 (현금·90%)" value={money(data.stats.scholarPaid)} sub={`${scholarCount}명 · 클릭해서 상세보기`} color="#f59e0b" glow />
+              </div>
               {data.stats.bankCnt > 0 && (() => {
                 const activeBankRows = (data.stats.bankRows||[]).filter(r => !excludedBank.has(r.rawName + r.date));
                 const activeTotal = activeBankRows.reduce((s,r)=>s+r.amount,0);
