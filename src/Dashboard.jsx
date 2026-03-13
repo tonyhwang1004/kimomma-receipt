@@ -247,6 +247,14 @@ export default function App() {
   const [scholarTotal, setScholarTotal] = useState(0);
   const [editAmounts, setEditAmounts] = useState({});
   const [resetting, setResetting] = useState(false);
+  const [bankWb, setBankWb] = useState(null);
+  const [bankRows, setBankRows] = useState([]);
+  const [bankWb, setBankWb] = useState(null);
+  const bankRef = useRef(null);
+  const [bankMatches, setBankMatches] = useState([]);
+  const [bankWb, setBankWb] = useState(null);
+  const [bankData, setBankData] = useState([]);
+  const bankRef = useRef([]);
   const [pastMonths, setPastMonths] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(null);
 
@@ -441,10 +449,59 @@ export default function App() {
       }));
   }, []);
 
-  const processData = useCallback((owb, rows8, rows7, rcpts) => {
+  // ── 계좌이체 파싱
+  const parseBank = useCallback((wb) => {
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+    // 헤더 찾기 (No가 있는 행)
+    let headerRow = -1;
+    rows.forEach((r, i) => { if (String(r[0]).trim() === "No") headerRow = i; });
+    if (headerRow < 0) return [];
+    const allStudents = [
+      ...(sheet8Ref.current||[]).map(r => String(r[0]||"").trim().replace(/^"|"$/g,'')),
+      ...(sheet7Ref.current||[]).map(r => String(r[0]||"").trim().replace(/^"|"$/g,'')),
+    ].filter(n => n && n !== "이름" && n !== "학생이름" && n !== "-");
+
+    const results = [];
+    rows.slice(headerRow + 1).forEach(r => {
+      const rawName = String(r[2]||"").trim();
+      const inAmt = Number(String(r[4]||"0").replace(/[^0-9]/g,'')) || 0;
+      const date = String(r[1]||"").substring(0, 10);
+      if (inAmt <= 0) return; // 출금 제외
+      // 학생 이름 매칭: 이름이 rawName 안에 포함되어 있으면 매칭
+      const matched = allStudents.find(name => {
+        if (!name || name.length < 2) return false;
+        const norm = normalizeName(name);
+        const rawNorm = normalizeName(rawName);
+        return rawNorm.includes(norm) || norm.includes(rawNorm);
+      });
+      results.push({ rawName, date, amount: inAmt, matched: matched || null });
+    });
+    return results;
+  }, []);
+
+  const handleBank = useCallback((wb) => {
+    bankRef.current = wb;
+    setBankWb(wb);
+    const matches = parseBank(wb);
+    setBankMatches(matches);
+  }, [parseBank]);
+
+  const processData = useCallback((owb, rows8, rows7, rcpts, bRows) => {
     if (!owb || !rows8 || !rows7) return;
     const online = parseOnline(owb);
     const payAmountMap = payAmountMapRef.current || {};
+    const bankData = bRows || [];
+    // 계좌이체 매칭: 이름 정규화 후 학생 명단과 비교
+    const bankMatched = new Set();
+    const bankAmountMap = {};
+    bankData.forEach(b => {
+      const norm = normalizeName(b.rawName);
+      bankMatched.add(norm);
+      bankAmountMap[norm] = (bankAmountMap[norm] || 0) + b.amount;
+    });
+    const bankNames = new Set(bankRef.current.map(b => normalizeName(b.name)));
+    const bankTotal = bankRef.current.reduce((s, b) => s + b.amount, 0);
     const off8Raw = parseSheetRows(rows8, "8층");
     const off7Raw = parseSheetRows(rows7, "7층");
     // 결제표 금액 매핑 (processData 안에서 처리)
@@ -527,9 +584,14 @@ export default function App() {
       stats: {
         onlinePaid, receiptTotal, scholarPaid, total: totalPaid,
         off8Paid: 0, off7Paid: 0,
+        bankTotal: Object.values(bankAmountMap).reduce((s,a)=>s+a,0),
+        bankCnt: Object.keys(bankAmountMap).length,
         unpaidCnt: unpaid8.length + unpaid7.length,
         unpaid8Cnt: unpaid8.length, unpaid7Cnt: unpaid7.length,
         unpaidAmt: [...unpaid8, ...unpaid7].reduce((s, u) => s + (u.결제금액||0), 0),
+        bankTotal,
+        bankTotal: bankRef.current.reduce((s, b) => s + b.amount, 0),
+        bankCnt: bankRef.current.length,
         students8: off8.length, students7: off7.length,
         paid8Cnt: off8WithPaid.filter(s => s.납부여부).length,
         paid7Cnt: off7WithPaid.filter(s => s.납부여부).length,
@@ -539,7 +601,52 @@ export default function App() {
     setTab("summary");
   }, []);
 
+  const handleBank = (wb) => {
+    setBankWb(wb);
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    // 헤더 행 찾기 (No, 거래일시, 보낸분/받는분...)
+    let headerRow = -1;
+    rows.forEach((r, i) => {
+      if (String(r[0]).includes("No") && String(r[1]).includes("거래")) headerRow = i;
+    });
+    if (headerRow < 0) { alert("계좌이체 파일 형식이 맞지 않아요!"); return; }
+    const data = [];
+    for (let i = headerRow + 1; i < rows.length; i++) {
+      const r = rows[i];
+      const name = String(r[2]||"").trim();
+      const income = Number(String(r[4]||"0").replace(/[^0-9]/g, "")) || 0;
+      const date = String(r[1]||"").substring(0, 10);
+      if (income > 0 && name) {
+        data.push({ name, amount: income, date, raw: name });
+      }
+    }
+    bankRef.current = data;
+    setBankData(data);
+    processData(onlineRef.current, sheet8Ref.current, sheet7Ref.current, receiptsRef.current);
+    console.log("계좌이체 입금:", data.length, "건");
+  };
+
   const handleOnline = (wb) => { onlineRef.current = wb; setOnlineWb(wb); processData(wb, sheet8Ref.current, sheet7Ref.current, receiptsRef.current); };
+
+  const handleBank = (wb) => {
+    setBankWb(wb);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+    // 헤더 행 찾기 (No, 거래일시 등)
+    let dataStart = 0;
+    raw.forEach((r, i) => { if (String(r[0]).trim() === "No") dataStart = i + 1; });
+    const rows = raw.slice(dataStart).filter(r => {
+      const income = Number(String(r[4]||"0").replace(/[^0-9.-]/g,''));
+      return income > 0;
+    }).map(r => ({
+      date: String(r[1]||"").substring(0,10).replace(/\./g,"-"),
+      rawName: String(r[2]||"").trim(),
+      amount: Number(String(r[4]||"0").replace(/[^0-9.-]/g,'')),
+    }));
+    setBankRows(rows);
+    processData(onlineRef.current, sheet8Ref.current, sheet7Ref.current, receiptsRef.current, rows);
+  };
 
   const filteredStudents = data?.allOff.filter((s) => {
     if (floorFilter !== "전체" && s.층 !== floorFilter) return false;
@@ -596,6 +703,8 @@ export default function App() {
             )}
             <div style={{ display: "grid", gap: 12 }}>
               <DropZone label="결제선생 xlsx 업로드" icon="💳" onFile={handleOnline} loaded={!!onlineWb} />
+              <DropZone label="계좌이체 xls 업로드" icon="🏦" onFile={handleBank} loaded={bankRows.length > 0} />
+              <DropZone label="계좌이체 xls 업로드" icon="🏦" onFile={handleBank} loaded={bankData.length > 0} />
             </div>
           </div>
           <p style={{ textAlign: "center", color: C.textMuted, fontSize: 12, marginTop: 20 }}>학생 명단 · 영수증 앱 데이터는 자동으로 불러옵니다 ☁️</p>
@@ -650,7 +759,7 @@ export default function App() {
           <div>
             {/* 정확한 수납 집계 */}
             <div style={{ background: C.surface, borderRadius: 16, padding: "16px 20px", border: `2px solid ${C.primary}`, marginBottom: 20 }}>
-              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>✅ 정확한 전체 수납 합계 (결제선생 + 영수증앱 + 장학생)</div>
+              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>✅ 정확한 전체 수납 합계 (결제선생 + 영수증앱 + 장학생 + 계좌이체)</div>
               <div style={{ fontSize: 32, fontWeight: 800, color: C.primary, letterSpacing: -1 }}>{money(data.stats.total)}</div>
             </div>
 
@@ -658,6 +767,9 @@ export default function App() {
               <StatCard icon="💳" label="결제선생 (온라인)" value={money(data.stats.onlinePaid)} sub={`${data.online.length}건 · 카드/간편결제`} color={C.blue} glow />
               <StatCard icon="🧾" label="영수증앱 (오프라인)" value={money(data.stats.receiptTotal)} sub={`${receipts.length}건 · 현장 현금 등`} color={C.warning} glow />
               <StatCard icon="🎓" label="장학생 납부 (현금·90%)" value={money(data.stats.scholarPaid)} sub={`${scholarCount}명 · 할인 10% 적용`} color="#f59e0b" glow />
+              {data.stats.bankCnt > 0 && <StatCard icon="🏦" label="계좌이체" value={money(data.stats.bankTotal)} sub={`${data.stats.bankCnt}건 · 입금 내역`} color={C.green} />}
+              <StatCard icon="🏦" label="계좌이체" value={money(data.stats.bankTotal||0)} sub={`${bankMatches.filter(m=>m.matched).length}건 매칭`} color="#10b981" />
+              {data.stats.bankCnt > 0 && <StatCard icon="🏦" label="계좌이체" value={money(data.stats.bankTotal)} sub={`${data.stats.bankCnt}건 · 입금 확인`} color={C.green||"#22c55e"} />}
               <StatCard icon="⚠️" label="미납 학생" value={`${data.stats.unpaidCnt}명`} sub={`추정 미수금 ${money(data.stats.unpaidAmt)}`} color={C.danger} />
             </div>
 
