@@ -721,7 +721,10 @@ export default function App() {
             {/* 정확한 수납 집계 */}
             <div style={{ background: C.surface, borderRadius: 16, padding: "16px 20px", border: `2px solid ${C.primary}`, marginBottom: 20 }}>
               <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>✅ 정확한 전체 수납 합계 (결제선생 + 영수증앱 + 장학생 + 계좌이체)</div>
-              <div style={{ fontSize: 32, fontWeight: 800, color: C.primary, letterSpacing: -1 }}>{money(data.stats.total)}</div>
+              <div style={{ fontSize: 32, fontWeight: 800, color: C.primary, letterSpacing: -1 }}>{money(
+                data.stats.onlinePaid + data.stats.receiptTotal + data.stats.scholarPaid +
+                (data.stats.bankRows||[]).filter(r => !excludedBank.has(r.rawName + r.date)).reduce((s,r)=>s+r.amount,0)
+              )}</div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 28 }}>
