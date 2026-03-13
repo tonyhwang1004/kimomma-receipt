@@ -257,6 +257,9 @@ export default function App() {
   const [excludedUnpaid, setExcludedUnpaid] = useState(new Set());
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [excludedOnline, setExcludedOnline] = useState(new Set());
+  const [onlineSearch, setOnlineSearch] = useState("");
+  const [receiptSearch, setReceiptSearch] = useState("");
+  const [bankSearch, setBankSearch] = useState("");
   const bankRef = useRef([]);
 
   // ── 구글시트 자동 로드 (명단 + 결제표 장학생 정보)
@@ -594,16 +597,6 @@ export default function App() {
     }
   }, [sheet8Rows, sheet7Rows]);
 
-  const modalStyle = {
-    overlay: { position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 },
-    box: { background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" },
-    searchInput: { width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #6366f1", fontSize:15, marginBottom:16, boxSizing:"border-box", outline:"none" },
-  };
-
-  const [onlineSearch, setOnlineSearch] = useState("");
-  const [receiptSearch, setReceiptSearch] = useState("");
-  const [bankSearch, setBankSearch] = useState("");
-
   const UnpaidModal = () => {
     if (!showUnpaidModal) return null;
     const allUnpaid = [...(data.off8||[]), ...(data.off7||[])].filter(s => !s.납부여부);
@@ -613,8 +606,8 @@ export default function App() {
     const u7 = unpaid.filter(s => s.층 === "7층");
     const total = unpaid.reduce((sum, s) => sum + (editAmounts[s.이름] !== undefined ? editAmounts[s.이름] : (s.결제금액||0)), 0);
     return (
-      <div onMouseDown={() => setShowUnpaidModal(false)} style={modalStyle.overlay}>
-        <div onMouseDown={e=>e.stopPropagation()} style={modalStyle.box}>
+      <div onMouseDown={() => setShowUnpaidModal(false)} style={MODAL_STYLE.overlay}>
+        <div onMouseDown={e=>e.stopPropagation()} style={MODAL_STYLE.box}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
             <div>
               <div style={{ fontWeight:800, fontSize:20 }}>⚠️ 미납 학생 현황</div>
@@ -659,8 +652,8 @@ export default function App() {
     const filtered = rows.filter(o => o.이름.includes(onlineSearch));
     const unpaidList = data.allOff.filter(s => !s.납부여부 && !rows.some(o => normalizeName(o.이름) === normalizeName(s.이름)));
     return (
-      <div onMouseDown={() => setShowOnlineModal(false)} style={modalStyle.overlay}>
-        <div onMouseDown={e=>e.stopPropagation()} style={modalStyle.box}>
+      <div onMouseDown={() => setShowOnlineModal(false)} style={MODAL_STYLE.overlay}>
+        <div onMouseDown={e=>e.stopPropagation()} style={MODAL_STYLE.box}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
             <div>
               <div style={{ fontWeight:800, fontSize:20 }}>💳 결제선생 상세 내역</div>
@@ -668,7 +661,7 @@ export default function App() {
             </div>
             <button onClick={()=>setShowOnlineModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
           </div>
-          <input value={onlineSearch} onChange={e => setOnlineSearch(e.target.value)} placeholder="🔍 이름 검색..." style={modalStyle.searchInput} />
+          <input value={onlineSearch} onChange={e => setOnlineSearch(e.target.value)} placeholder="🔍 이름 검색..." style={MODAL_STYLE.searchInput} />
           <div style={{ display:"grid", gap:8 }}>
             {filtered.map((o,i) => (
               <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px 110px 44px", gap:12, alignItems:"center", padding:"12px 16px", background:"#eff6ff", borderRadius:12, border:"1px solid #bfdbfe" }}>
@@ -701,8 +694,8 @@ export default function App() {
     const filtered = receipts.filter(r => r.name.includes(receiptSearch));
     const unpaidList = data.allOff.filter(s => !s.납부여부 && !receipts.some(r => normalizeName(r.name) === normalizeName(s.이름)));
     return (
-      <div onMouseDown={() => setShowReceiptModal(false)} style={modalStyle.overlay}>
-        <div onMouseDown={e=>e.stopPropagation()} style={modalStyle.box}>
+      <div onMouseDown={() => setShowReceiptModal(false)} style={MODAL_STYLE.overlay}>
+        <div onMouseDown={e=>e.stopPropagation()} style={MODAL_STYLE.box}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
             <div>
               <div style={{ fontWeight:800, fontSize:20 }}>🧾 영수증앱 상세 내역</div>
@@ -710,7 +703,7 @@ export default function App() {
             </div>
             <button onClick={()=>setShowReceiptModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
           </div>
-          <input value={receiptSearch} onChange={e => setReceiptSearch(e.target.value)} placeholder="🔍 이름 검색..." style={modalStyle.searchInput} />
+          <input value={receiptSearch} onChange={e => setReceiptSearch(e.target.value)} placeholder="🔍 이름 검색..." style={MODAL_STYLE.searchInput} />
           <div style={{ display:"grid", gap:8 }}>
             {filtered.map((r,i) => (
               <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px 110px", gap:12, alignItems:"center", padding:"12px 16px", background:"#fffbeb", borderRadius:12, border:"1px solid #fde68a" }}>
@@ -744,8 +737,8 @@ export default function App() {
     const excluded = total - active;
     const filtered = rows.filter(r => r.rawName.includes(bankSearch));
     return (
-      <div onMouseDown={() => setShowBankModal(false)} style={modalStyle.overlay}>
-        <div onMouseDown={e=>e.stopPropagation()} style={modalStyle.box}>
+      <div onMouseDown={() => setShowBankModal(false)} style={MODAL_STYLE.overlay}>
+        <div onMouseDown={e=>e.stopPropagation()} style={MODAL_STYLE.box}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
             <div>
               <div style={{ fontWeight:800, fontSize:20 }}>🏦 계좌이체 상세 내역</div>
@@ -753,7 +746,7 @@ export default function App() {
             </div>
             <button onClick={() => setShowBankModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
           </div>
-          <input value={bankSearch} onChange={e => setBankSearch(e.target.value)} placeholder="🔍 이름 검색..." style={modalStyle.searchInput} />
+          <input value={bankSearch} onChange={e => setBankSearch(e.target.value)} placeholder="🔍 이름 검색..." style={MODAL_STYLE.searchInput} />
           <div style={{ display:"grid", gap:8 }}>
             {filtered.map((r, i) => (
               <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px 110px 44px", gap:12, alignItems:"center", padding:"12px 16px", background:"#f0fdf4", borderRadius:12, border:"1px solid #bbf7d0" }}>
