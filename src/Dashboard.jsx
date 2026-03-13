@@ -649,9 +649,9 @@ export default function App() {
   };
 
   const OnlineModal = () => {
+    const [onlineSearch, setOnlineSearch] = React.useState("");
     if (!showOnlineModal) return null;
     const rows = data.online.filter(o => !excludedOnline.has(o.이름+o.금액));
-    const [onlineSearch, setOnlineSearch] = React.useState("");
     const excluded = data.online.length - data.online.filter(o => !excludedOnline.has(o.이름+o.금액)).length;
     return (
       <div onMouseDown={() => setShowOnlineModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
@@ -701,8 +701,8 @@ export default function App() {
   };
 
   const ReceiptModal = () => {
-    if (!showReceiptModal) return null;
     const [receiptSearch, setReceiptSearch] = React.useState("");
+    if (!showReceiptModal) return null;
     return (
       <div onMouseDown={() => setShowReceiptModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
         <div onMouseDown={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
@@ -749,8 +749,8 @@ export default function App() {
   };
 
   const BankModal = () => {
-    if (!showBankModal) return null;
     const [bankSearch, setBankSearch] = React.useState("");
+    if (!showBankModal) return null;
     const rows = (data?.stats?.bankRows || []).filter(r => !excludedBank.has(r.rawName + r.date) && r.rawName.includes(bankSearch));
     const active = rows.length;
     const total = data?.stats?.bankRows?.length || 0;
