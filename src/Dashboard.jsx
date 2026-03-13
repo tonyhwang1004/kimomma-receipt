@@ -254,6 +254,7 @@ export default function App() {
   const [excludedBank, setExcludedBank] = useState(new Set());
   const [showOnlineModal, setShowOnlineModal] = useState(false);
   const [showUnpaidModal, setShowUnpaidModal] = useState(false);
+  const [excludedUnpaid, setExcludedUnpaid] = useState(new Set());
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showScholarModal, setShowScholarModal] = useState(false);
   const [excludedOnline, setExcludedOnline] = useState(new Set());
@@ -593,21 +594,23 @@ export default function App() {
 
   const UnpaidModal = () => {
     if (!showUnpaidModal) return null;
-    const unpaid = [...(data.off8||[]), ...(data.off7||[])].filter(s => !s.납부여부);
+    const allUnpaid = [...(data.off8||[]), ...(data.off7||[])].filter(s => !s.납부여부);
+    const unpaid = allUnpaid.filter(s => !excludedUnpaid.has(s.이름));
+    const excludedCount = allUnpaid.length - unpaid.length;
     const u8 = unpaid.filter(s => s.층 === "8층");
     const u7 = unpaid.filter(s => s.층 === "7층");
     const total = unpaid.reduce((sum, s) => sum + (editAmounts[s.이름] !== undefined ? editAmounts[s.이름] : (s.결제금액||0)), 0);
     const Row = ({s}) => {
       const amt = editAmounts[s.이름] !== undefined ? editAmounts[s.이름] : (s.결제금액||0);
       return (
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 80px 130px 110px", gap:10, alignItems:"center", padding:"10px 14px", background:"#fef2f2", borderRadius:10, border:"1px solid #fecaca", marginBottom:6 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 80px 130px 44px", gap:10, alignItems:"center", padding:"10px 14px", background:"#fef2f2", borderRadius:10, border:"1px solid #fecaca", marginBottom:6 }}>
           <div>
             <div style={{ fontWeight:700, fontSize:14 }}>{s.이름} {scholarSetRef.current.has(normalizeName(s.이름)) && <span style={{ fontSize:11, color:"#f59e0b" }}>🎓</span>}</div>
-            <div style={{ fontSize:11, color:"#9ca3af" }}>{s.좌석유형} · {s.자리}번</div>
+            <div style={{ fontSize:11, color:"#9ca3af" }}>{s.좌석유형} · {s.자리}번 · {s.층}</div>
           </div>
-          <div style={{ fontSize:12, color:"#6b7280" }}>{s.층}</div>
+          <div style={{ fontSize:12, color:"#6b7280" }}>{s.전화||""}</div>
           <div style={{ fontWeight:700, color:"#ef4444", textAlign:"right", fontSize:14 }}>{amt > 0 ? money(amt) : "미확인"}</div>
-          <div style={{ fontSize:11, color:"#9ca3af", textAlign:"right" }}>{s.전화||""}</div>
+          <button onClick={()=>setExcludedUnpaid(prev=>{const ns=new Set(prev);ns.add(s.이름);return ns;})} style={{ background:"#fee2e2", border:"none", borderRadius:8, width:36, height:36, cursor:"pointer", fontSize:16 }}>🗑</button>
         </div>
       );
     };
@@ -617,7 +620,9 @@ export default function App() {
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
             <div>
               <div style={{ fontWeight:800, fontSize:20 }}>⚠️ 미납 학생 현황</div>
-              <div style={{ fontSize:13, color:"#6b7280", marginTop:4 }}>총 {unpaid.length}명 · 추정 미수금 {total.toLocaleString()}원</div>
+              <div style={{ fontSize:13, color:"#6b7280", marginTop:4 }}>
+                총 {unpaid.length}명 · {excludedCount > 0 && <span style={{color:"#ef4444"}}>제외 {excludedCount}명 · </span>}추정 미수금 {total.toLocaleString()}원
+              </div>
             </div>
             <button onClick={()=>setShowUnpaidModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
           </div>
@@ -632,6 +637,9 @@ export default function App() {
               <div style={{ fontWeight:700, fontSize:14, color:"#8b5cf6", marginBottom:8 }}>🏢 7층 ({u7.length}명)</div>
               {u7.map((s,i) => <Row key={i} s={s} />)}
             </div>
+          )}
+          {excludedCount > 0 && (
+            <button onClick={()=>setExcludedUnpaid(new Set())} style={{ marginTop:16, padding:"8px 16px", borderRadius:10, border:"1px solid #d1d5db", background:"transparent", color:"#6b7280", fontSize:13, cursor:"pointer" }}>🔄 제외 항목 복원</button>
           )}
         </div>
       </div>
@@ -926,9 +934,15 @@ export default function App() {
                   </div>
                 );
               })()}
-              <div onClick={() => setShowUnpaidModal(true)} style={{ cursor: "pointer" }}>
-                <StatCard icon="⚠️" label="미납 학생" value={`${data.stats.unpaidCnt}명`} sub={`추정 미수금 ${money(data.stats.unpaidAmt)} · 클릭해서 상세보기`} color={C.danger} />
-              </div>
+              {(() => {
+                const activeUnpaid = [...(data.off8||[]), ...(data.off7||[])].filter(s => !s.납부여부 && !excludedUnpaid.has(s.이름));
+                const activeAmt = activeUnpaid.reduce((sum,s) => sum + (editAmounts[s.이름] !== undefined ? editAmounts[s.이름] : (s.결제금액||0)), 0);
+                return (
+                  <div onClick={() => setShowUnpaidModal(true)} style={{ cursor: "pointer" }}>
+                    <StatCard icon="⚠️" label="미납 학생" value={`${activeUnpaid.length}명`} sub={`추정 미수금 ${money(activeAmt)} · 클릭해서 상세보기`} color={C.danger} />
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 7/8층 참고용 */}
