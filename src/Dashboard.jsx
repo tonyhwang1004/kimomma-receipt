@@ -249,6 +249,7 @@ export default function App() {
   const [resetting, setResetting] = useState(false);
   const [pastMonths, setPastMonths] = useState([]);
   const [bankRows, setBankRows] = useState([]);
+  const [showBankModal, setShowBankModal] = useState(false);
   const bankRef = useRef([]);
 
   // ── 구글시트 자동 로드 (명단 + 결제표 장학생 정보)
@@ -486,6 +487,7 @@ export default function App() {
         off8Paid: 0, off7Paid: 0,
         bankTotal: Object.values(bankAmountMap).reduce((s,a)=>s+a,0),
         bankCnt: Object.keys(bankAmountMap).length,
+        bankRows: bankData.map(b => ({ ...b, matched: bankMatched.has(normalizeName(b.rawName)), norm: normalizeName(b.rawName) })),
         unpaidCnt: unpaid8.length + unpaid7.length,
         unpaid8Cnt: unpaid8.length, unpaid7Cnt: unpaid7.length,
         unpaidAmt: [...unpaid8, ...unpaid7].reduce((s, u) => s + (u.결제금액||0), 0),
@@ -568,6 +570,48 @@ export default function App() {
     }
   }, [sheet8Rows, sheet7Rows]);
 
+  const BankModal = () => {
+    if (!showBankModal) return null;
+    const rows = data?.stats?.bankRows || [];
+    const matched = rows.filter(r => r.matched);
+    const unmatched = rows.filter(r => !r.matched);
+    return (
+      <div onClick={() => setShowBankModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 600, maxHeight: "80vh", overflowY: "auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>🏦 계좌이체 상세 내역</div>
+            <button onClick={() => setShowBankModal(false)} style={{ border: "none", background: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
+          </div>
+          <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>
+            총 {rows.length}건 · 매칭 {matched.length}명 · 미매칭 {unmatched.length}건
+          </div>
+          {unmatched.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 700, color: "#ef4444", fontSize: 13, marginBottom: 8 }}>⚠️ 학생 미매칭 ({unmatched.length}건) - 확인 필요</div>
+              {unmatched.map((r, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "#fef2f2", borderRadius: 8, marginBottom: 4, fontSize: 13 }}>
+                  <span style={{ color: "#ef4444" }}>{r.rawName}</span>
+                  <span style={{ fontWeight: 600 }}>{r.amount.toLocaleString()}원</span>
+                  <span style={{ color: "#9ca3af" }}>{r.date}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div>
+            <div style={{ fontWeight: 700, color: "#10b981", fontSize: 13, marginBottom: 8 }}>✅ 학생 매칭 ({matched.length}건)</div>
+            {matched.map((r, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "#f0fdf4", borderRadius: 8, marginBottom: 4, fontSize: 13 }}>
+                <span style={{ fontWeight: 600 }}>{r.rawName}</span>
+                <span style={{ fontWeight: 600 }}>{r.amount.toLocaleString()}원</span>
+                <span style={{ color: "#9ca3af" }}>{r.date}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (!data) {
     return (
       <div style={{ minHeight: "100dvh", background: C.bg, fontFamily: "'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -627,6 +671,8 @@ export default function App() {
   ];
 
   return (
+    <>
+    <BankModal />
     <div style={{ minHeight: "100dvh", background: C.bg, fontFamily: "'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif", color: C.text }}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
@@ -671,7 +717,11 @@ export default function App() {
               <StatCard icon="💳" label="결제선생 (온라인)" value={money(data.stats.onlinePaid)} sub={`${data.online.length}건 · 카드/간편결제`} color={C.blue} glow />
               <StatCard icon="🧾" label="영수증앱 (오프라인)" value={money(data.stats.receiptTotal)} sub={`${receipts.length}건 · 현장 현금 등`} color={C.warning} glow />
               <StatCard icon="🎓" label="장학생 납부 (현금·90%)" value={money(data.stats.scholarPaid)} sub={`${scholarCount}명 · 할인 10% 적용`} color="#f59e0b" glow />
-              {data.stats.bankCnt > 0 && <StatCard icon="🏦" label="계좌이체" value={money(data.stats.bankTotal)} sub={`${data.stats.bankCnt}건 · 입금 확인`} color="#10b981" />}
+              {data.stats.bankCnt > 0 && (
+                <div onClick={() => setShowBankModal(true)} style={{ cursor: "pointer" }}>
+                  <StatCard icon="🏦" label="계좌이체" value={money(data.stats.bankTotal)} sub={`${data.stats.bankCnt}건 · 클릭해서 상세보기`} color="#10b981" />
+                </div>
+              )}
               <StatCard icon="⚠️" label="미납 학생" value={`${data.stats.unpaidCnt}명`} sub={`추정 미수금 ${money(data.stats.unpaidAmt)}`} color={C.danger} />
             </div>
 
@@ -922,5 +972,6 @@ export default function App() {
         )}
       </div>
     </div>
+  </>
   );
 }
