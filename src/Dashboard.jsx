@@ -446,6 +446,8 @@ export default function App() {
       }));
   }, []);
 
+  const handleOnline = (wb) => { onlineRef.current = wb; setOnlineWb(wb); processData(wb, sheet8Ref.current, sheet7Ref.current, receiptsRef.current); };
+
   const handleBank = (wb) => {
     setBankWb(wb);
     const ws = wb.Sheets[wb.SheetNames[0]];
