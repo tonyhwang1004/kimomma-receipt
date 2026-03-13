@@ -584,7 +584,7 @@ export default function App() {
             )}
           </div>
           <div style={{ background: C.surface, borderRadius: 20, padding: 28, border: `1px solid ${C.border}`, boxShadow: "0 8px 40px rgba(76,110,245,0.10)" }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: C.textSub, marginBottom: 8 }}>📂 결제선생 파일만 업로드하면 됩니다!</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.textSub, marginBottom: 8 }}>📂 결제선생 + 계좌이체 파일을 모두 업로드하면 됩니다!</div>
             {sheetLoading && <div style={{ fontSize: 13, color: C.primary, marginBottom: 16 }}>⟳ 학생 명단 자동 로드 중...</div>}
             {sheetError && <div style={{ fontSize: 13, color: C.danger, marginBottom: 16 }}>⚠️ {sheetError}</div>}
             {!sheetLoading && !sheetError && (
