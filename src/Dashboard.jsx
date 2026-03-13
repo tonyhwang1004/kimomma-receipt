@@ -327,7 +327,7 @@ export default function App() {
       pay7ScholarNames.forEach(n => scholars.add(n));
       scanScholar(pay7, "7층");
       // 장학생 실납부액 = 8층만 현금결제 × 90% 합산 (계좌이체로 납부한 장학생 제외)
-      const bankNorms = new Set((bRows||bankRef.current||[]).map(b => normalizeName(b.rawName)));
+      const bankNorms = new Set((bankRef.current||[]).map(b => normalizeName(b.rawName)));
       const scholarTotal = Object.entries(scholarAmounts)
         .filter(([name]) => !pay7ScholarNames.has(name) && !bankNorms.has(name))
         .reduce((s, [, a]) => s + Math.round(a * 0.9), 0);
