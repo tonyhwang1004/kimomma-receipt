@@ -514,9 +514,21 @@ export default function App() {
     const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
     let dataStart = 0;
     raw.forEach((r, i) => { if (String(r[0]).trim() === "No") dataStart = i + 1; });
+
+    // 학생 명단 이름 목록 (8층 + 7층)
+    const studentNames = [
+      ...(sheet8Ref.current || []),
+      ...(sheet7Ref.current || [])
+    ].map(r => normalizeName(String(r[0]||"").trim().replace(/^"|"$/g,'')))
+     .filter(n => n && n !== "이름" && n !== "학생이름");
+
     const rows = raw.slice(dataStart).filter(r => {
       const income = Number(String(r[4]||"0").replace(/[^0-9.-]/g,''));
-      return income > 0;
+      if (income <= 0) return false;
+      // 입금자 이름에 학생 이름이 포함되어 있는지 확인
+      const rawName = String(r[2]||"").trim();
+      const normRaw = normalizeName(rawName);
+      return studentNames.some(sn => sn.length >= 2 && (normRaw.includes(sn) || sn.includes(normRaw)));
     }).map(r => ({
       date: String(r[1]||"").substring(0,10),
       rawName: String(r[2]||"").trim(),
