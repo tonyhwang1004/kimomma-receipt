@@ -250,6 +250,7 @@ export default function App() {
   const [pastMonths, setPastMonths] = useState([]);
   const [bankRows, setBankRows] = useState([]);
   const [showBankModal, setShowBankModal] = useState(false);
+  const [excludedBank, setExcludedBank] = useState(new Set());
   const bankRef = useRef([]);
 
   // ── 구글시트 자동 로드 (명단 + 결제표 장학생 정보)
@@ -584,41 +585,39 @@ export default function App() {
 
   const BankModal = () => {
     if (!showBankModal) return null;
-    const rows = data?.stats?.bankRows || [];
-    const matched = rows.filter(r => r.matched);
-    const unmatched = rows.filter(r => !r.matched);
+    const rows = (data?.stats?.bankRows || []).filter(r => !excludedBank.has(r.rawName + r.date));
+    const active = rows.length;
+    const total = data?.stats?.bankRows?.length || 0;
+    const excluded = total - active;
     return (
-      <div onClick={() => setShowBankModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-        <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 600, maxHeight: "80vh", overflowY: "auto" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>🏦 계좌이체 상세 내역</div>
-            <button onClick={() => setShowBankModal(false)} style={{ border: "none", background: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
-          </div>
-          <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>
-            총 {rows.length}건 · 매칭 {matched.length}명 · 미매칭 {unmatched.length}건
-          </div>
-          {unmatched.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontWeight: 700, color: "#ef4444", fontSize: 13, marginBottom: 8 }}>⚠️ 학생 미매칭 ({unmatched.length}건) - 확인 필요</div>
-              {unmatched.map((r, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "#fef2f2", borderRadius: 8, marginBottom: 4, fontSize: 13 }}>
-                  <span style={{ color: "#ef4444" }}>{r.rawName}</span>
-                  <span style={{ fontWeight: 600 }}>{r.amount.toLocaleString()}원</span>
-                  <span style={{ color: "#9ca3af" }}>{r.date}</span>
-                </div>
-              ))}
+      <div onClick={() => setShowBankModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+        <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: 28, width: "100%", maxWidth: 800, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 20 }}>🏦 계좌이체 상세 내역</div>
+              <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
+                총 {active}건 · {excluded > 0 && <span style={{ color: "#ef4444" }}>제외 {excluded}건 · </span>}
+                합계 {rows.reduce((s,r)=>s+r.amount,0).toLocaleString()}원
+              </div>
             </div>
-          )}
-          <div>
-            <div style={{ fontWeight: 700, color: "#10b981", fontSize: 13, marginBottom: 8 }}>✅ 학생 매칭 ({matched.length}건)</div>
-            {matched.map((r, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "#f0fdf4", borderRadius: 8, marginBottom: 4, fontSize: 13 }}>
-                <span style={{ fontWeight: 600 }}>{r.rawName}</span>
-                <span style={{ fontWeight: 600 }}>{r.amount.toLocaleString()}원</span>
-                <span style={{ color: "#9ca3af" }}>{r.date}</span>
+            <button onClick={() => setShowBankModal(false)} style={{ border: "none", background: "#f3f4f6", borderRadius: 10, width: 36, height: 36, fontSize: 18, cursor: "pointer" }}>✕</button>
+          </div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {rows.map((r, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 130px 110px 44px", gap: 12, alignItems: "center", padding: "12px 16px", background: "#f0fdf4", borderRadius: 12, border: "1px solid #bbf7d0" }}>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{r.rawName}</div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: "#10b981", textAlign: "right" }}>{r.amount.toLocaleString()}원</div>
+                <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "right" }}>{r.date}</div>
+                <button onClick={() => setExcludedBank(prev => { const s = new Set(prev); s.add(r.rawName + r.date); return s; })}
+                  style={{ background: "#fee2e2", border: "none", borderRadius: 8, width: 36, height: 36, cursor: "pointer", fontSize: 16, color: "#ef4444" }}>🗑</button>
               </div>
             ))}
           </div>
+          {excluded > 0 && (
+            <button onClick={() => setExcludedBank(new Set())} style={{ marginTop: 16, padding: "8px 16px", borderRadius: 10, border: "1px solid #d1d5db", background: "transparent", color: "#6b7280", fontSize: 13, cursor: "pointer" }}>
+              🔄 제외 항목 복원
+            </button>
+          )}
         </div>
       </div>
     );
@@ -729,11 +728,15 @@ export default function App() {
               <StatCard icon="💳" label="결제선생 (온라인)" value={money(data.stats.onlinePaid)} sub={`${data.online.length}건 · 카드/간편결제`} color={C.blue} glow />
               <StatCard icon="🧾" label="영수증앱 (오프라인)" value={money(data.stats.receiptTotal)} sub={`${receipts.length}건 · 현장 현금 등`} color={C.warning} glow />
               <StatCard icon="🎓" label="장학생 납부 (현금·90%)" value={money(data.stats.scholarPaid)} sub={`${scholarCount}명 · 할인 10% 적용`} color="#f59e0b" glow />
-              {data.stats.bankCnt > 0 && (
-                <div onClick={() => setShowBankModal(true)} style={{ cursor: "pointer" }}>
-                  <StatCard icon="🏦" label="계좌이체" value={money(data.stats.bankTotal)} sub={`${data.stats.bankCnt}건 · 클릭해서 상세보기`} color="#10b981" />
-                </div>
-              )}
+              {data.stats.bankCnt > 0 && (() => {
+                const activeBankRows = (data.stats.bankRows||[]).filter(r => !excludedBank.has(r.rawName + r.date));
+                const activeTotal = activeBankRows.reduce((s,r)=>s+r.amount,0);
+                return (
+                  <div onClick={() => setShowBankModal(true)} style={{ cursor: "pointer" }}>
+                    <StatCard icon="🏦" label="계좌이체" value={money(activeTotal)} sub={`${activeBankRows.length}건 · 클릭해서 상세보기`} color="#10b981" />
+                  </div>
+                );
+              })()}
               <StatCard icon="⚠️" label="미납 학생" value={`${data.stats.unpaidCnt}명`} sub={`추정 미수금 ${money(data.stats.unpaidAmt)}`} color={C.danger} />
             </div>
 
