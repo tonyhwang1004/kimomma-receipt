@@ -253,6 +253,7 @@ export default function App() {
   const [showBankModal, setShowBankModal] = useState(false);
   const [excludedBank, setExcludedBank] = useState(new Set());
   const [showOnlineModal, setShowOnlineModal] = useState(false);
+  const [showUnpaidModal, setShowUnpaidModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showScholarModal, setShowScholarModal] = useState(false);
   const [excludedOnline, setExcludedOnline] = useState(new Set());
@@ -590,6 +591,53 @@ export default function App() {
     }
   }, [sheet8Rows, sheet7Rows]);
 
+  const UnpaidModal = () => {
+    if (!showUnpaidModal) return null;
+    const unpaid = [...(data.off8||[]), ...(data.off7||[])].filter(s => !s.납부여부);
+    const u8 = unpaid.filter(s => s.층 === "8층");
+    const u7 = unpaid.filter(s => s.층 === "7층");
+    const total = unpaid.reduce((sum, s) => sum + (editAmounts[s.이름] !== undefined ? editAmounts[s.이름] : (s.결제금액||0)), 0);
+    const Row = ({s}) => {
+      const amt = editAmounts[s.이름] !== undefined ? editAmounts[s.이름] : (s.결제금액||0);
+      return (
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 80px 130px 110px", gap:10, alignItems:"center", padding:"10px 14px", background:"#fef2f2", borderRadius:10, border:"1px solid #fecaca", marginBottom:6 }}>
+          <div>
+            <div style={{ fontWeight:700, fontSize:14 }}>{s.이름} {scholarSetRef.current.has(normalizeName(s.이름)) && <span style={{ fontSize:11, color:"#f59e0b" }}>🎓</span>}</div>
+            <div style={{ fontSize:11, color:"#9ca3af" }}>{s.좌석유형} · {s.자리}번</div>
+          </div>
+          <div style={{ fontSize:12, color:"#6b7280" }}>{s.층}</div>
+          <div style={{ fontWeight:700, color:"#ef4444", textAlign:"right", fontSize:14 }}>{amt > 0 ? money(amt) : "미확인"}</div>
+          <div style={{ fontSize:11, color:"#9ca3af", textAlign:"right" }}>{s.전화||""}</div>
+        </div>
+      );
+    };
+    return (
+      <div onClick={() => setShowUnpaidModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+            <div>
+              <div style={{ fontWeight:800, fontSize:20 }}>⚠️ 미납 학생 현황</div>
+              <div style={{ fontSize:13, color:"#6b7280", marginTop:4 }}>총 {unpaid.length}명 · 추정 미수금 {total.toLocaleString()}원</div>
+            </div>
+            <button onClick={()=>setShowUnpaidModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
+          </div>
+          {u8.length > 0 && (
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontWeight:700, fontSize:14, color:"#3b82f6", marginBottom:8 }}>🏢 8층 ({u8.length}명)</div>
+              {u8.map((s,i) => <Row key={i} s={s} />)}
+            </div>
+          )}
+          {u7.length > 0 && (
+            <div>
+              <div style={{ fontWeight:700, fontSize:14, color:"#8b5cf6", marginBottom:8 }}>🏢 7층 ({u7.length}명)</div>
+              {u7.map((s,i) => <Row key={i} s={s} />)}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const OnlineModal = () => {
     if (!showOnlineModal) return null;
     const rows = data.online.filter(o => !excludedOnline.has(o.이름+o.금액));
@@ -811,6 +859,7 @@ export default function App() {
 
   return (
     <>
+    <UnpaidModal />
     <OnlineModal />
     <ReceiptModal />
     <ScholarModal />
@@ -877,7 +926,9 @@ export default function App() {
                   </div>
                 );
               })()}
-              <StatCard icon="⚠️" label="미납 학생" value={`${data.stats.unpaidCnt}명`} sub={`추정 미수금 ${money(data.stats.unpaidAmt)}`} color={C.danger} />
+              <div onClick={() => setShowUnpaidModal(true)} style={{ cursor: "pointer" }}>
+                <StatCard icon="⚠️" label="미납 학생" value={`${data.stats.unpaidCnt}명`} sub={`추정 미수금 ${money(data.stats.unpaidAmt)} · 클릭해서 상세보기`} color={C.danger} />
+              </div>
             </div>
 
             {/* 7/8층 참고용 */}
