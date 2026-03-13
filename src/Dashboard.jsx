@@ -787,7 +787,7 @@ export default function App() {
 
   const BankModal = () => {
     if (!showBankModal) return null;
-    const rows = (data?.stats?.bankRows || []).filter(r => !excludedBank.has(r.rawName + r.date));
+    const rows = (data?.stats?.bankRows || []).filter(r => !excludedBank.has(r.rawName + r.date) && r.rawName.includes(searchBank));
     const active = rows.length;
     const total = data?.stats?.bankRows?.length || 0;
     const excluded = total - active;
@@ -802,8 +802,9 @@ export default function App() {
                 합계 {rows.reduce((s,r)=>s+r.amount,0).toLocaleString()}원
               </div>
             </div>
-            <button onClick={() => setShowBankModal(false)} style={{ border: "none", background: "#f3f4f6", borderRadius: 10, width: 36, height: 36, fontSize: 18, cursor: "pointer" }}>✕</button>
+            <button onClick={() => {setShowBankModal(false);setSearchBank("");}} style={{ border: "none", background: "#f3f4f6", borderRadius: 10, width: 36, height: 36, fontSize: 18, cursor: "pointer" }}>✕</button>
           </div>
+          <SearchBox value={searchBank} onChange={setSearchBank} />
           <div style={{ display: "grid", gap: 8 }}>
             {rows.map((r, i) => (
               <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 130px 110px 44px", gap: 12, alignItems: "center", padding: "12px 16px", background: "#f0fdf4", borderRadius: 12, border: "1px solid #bbf7d0" }}>
