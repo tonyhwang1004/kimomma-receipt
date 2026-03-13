@@ -778,14 +778,11 @@ export default function App() {
   const SearchBox = ({ value, onChange }) => (
     <input
       value={value}
-      onChange={e => onChange(e.target.value)}
+      onChange={e => { e.stopPropagation(); onChange(e.target.value); }}
       placeholder="🔍 이름 검색..."
       autoFocus
-      style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #6366f1", fontSize:14, marginBottom:16, boxSizing:"border-box", outline:"none" }}
+      style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #6366f1", fontSize:15, marginBottom:16, boxSizing:"border-box", outline:"none" }}
       onClick={e => e.stopPropagation()}
-      onKeyDown={e => e.stopPropagation()}
-      onKeyUp={e => e.stopPropagation()}
-      onKeyPress={e => e.stopPropagation()}
     />
   );
 
