@@ -594,6 +594,16 @@ export default function App() {
     }
   }, [sheet8Rows, sheet7Rows]);
 
+  const modalStyle = {
+    overlay: { position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 },
+    box: { background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" },
+    searchInput: { width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #6366f1", fontSize:15, marginBottom:16, boxSizing:"border-box", outline:"none" },
+  };
+
+  const [onlineSearch, setOnlineSearch] = useState("");
+  const [receiptSearch, setReceiptSearch] = useState("");
+  const [bankSearch, setBankSearch] = useState("");
+
   const UnpaidModal = () => {
     if (!showUnpaidModal) return null;
     const allUnpaid = [...(data.off8||[]), ...(data.off7||[])].filter(s => !s.납부여부);
@@ -602,70 +612,65 @@ export default function App() {
     const u8 = unpaid.filter(s => s.층 === "8층");
     const u7 = unpaid.filter(s => s.층 === "7층");
     const total = unpaid.reduce((sum, s) => sum + (editAmounts[s.이름] !== undefined ? editAmounts[s.이름] : (s.결제금액||0)), 0);
-    const Row = ({s}) => {
-      const amt = editAmounts[s.이름] !== undefined ? editAmounts[s.이름] : (s.결제금액||0);
-      return (
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 80px 130px 44px", gap:10, alignItems:"center", padding:"10px 14px", background:"#fef2f2", borderRadius:10, border:"1px solid #fecaca", marginBottom:6 }}>
-          <div>
-            <div style={{ fontWeight:700, fontSize:14 }}>{s.이름} {scholarSetRef.current.has(normalizeName(s.이름)) && <span style={{ fontSize:11, color:"#f59e0b" }}>🎓</span>}</div>
-            <div style={{ fontSize:11, color:"#9ca3af" }}>{s.좌석유형} · {s.자리}번 · {s.층}</div>
-          </div>
-          <div style={{ fontSize:12, color:"#6b7280" }}>{s.전화||""}</div>
-          <div style={{ fontWeight:700, color:"#ef4444", textAlign:"right", fontSize:14 }}>{amt > 0 ? money(amt) : "미확인"}</div>
-          <button onClick={()=>setExcludedUnpaid(prev=>{const ns=new Set(prev);ns.add(s.이름);return ns;})} style={{ background:"#fee2e2", border:"none", borderRadius:8, width:36, height:36, cursor:"pointer", fontSize:16 }}>🗑</button>
-        </div>
-      );
-    };
     return (
-      <div onMouseDown={() => setShowUnpaidModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-        <div onMouseDown={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
+      <div onMouseDown={() => setShowUnpaidModal(false)} style={modalStyle.overlay}>
+        <div onMouseDown={e=>e.stopPropagation()} style={modalStyle.box}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
             <div>
               <div style={{ fontWeight:800, fontSize:20 }}>⚠️ 미납 학생 현황</div>
-              <div style={{ fontSize:13, color:"#6b7280", marginTop:4 }}>
-                총 {unpaid.length}명 · {excludedCount > 0 && <span style={{color:"#ef4444"}}>제외 {excludedCount}명 · </span>}추정 미수금 {total.toLocaleString()}원
-              </div>
+              <div style={{ fontSize:13, color:"#6b7280", marginTop:4 }}>총 {unpaid.length}명 · {excludedCount > 0 && <span style={{color:"#ef4444"}}>제외 {excludedCount}명 · </span>}추정 미수금 {total.toLocaleString()}원</div>
             </div>
             <button onClick={()=>setShowUnpaidModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
           </div>
-          {u8.length > 0 && (
-            <div style={{ marginBottom:20 }}>
-              <div style={{ fontWeight:700, fontSize:14, color:"#3b82f6", marginBottom:8 }}>🏢 8층 ({u8.length}명)</div>
-              {u8.map((s,i) => <Row key={i} s={s} />)}
-            </div>
-          )}
-          {u7.length > 0 && (
-            <div>
-              <div style={{ fontWeight:700, fontSize:14, color:"#8b5cf6", marginBottom:8 }}>🏢 7층 ({u7.length}명)</div>
-              {u7.map((s,i) => <Row key={i} s={s} />)}
-            </div>
-          )}
-          {excludedCount > 0 && (
-            <button onClick={()=>setExcludedUnpaid(new Set())} style={{ marginTop:16, padding:"8px 16px", borderRadius:10, border:"1px solid #d1d5db", background:"transparent", color:"#6b7280", fontSize:13, cursor:"pointer" }}>🔄 제외 항목 복원</button>
-          )}
+          {u8.length > 0 && <div style={{ marginBottom:20 }}>
+            <div style={{ fontWeight:700, fontSize:14, color:"#3b82f6", marginBottom:8 }}>🏢 8층 ({u8.length}명)</div>
+            {u8.map((s,i) => {
+              const amt = editAmounts[s.이름] !== undefined ? editAmounts[s.이름] : (s.결제금액||0);
+              return <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 80px 130px 44px", gap:10, alignItems:"center", padding:"10px 14px", background:"#fef2f2", borderRadius:10, border:"1px solid #fecaca", marginBottom:6 }}>
+                <div><div style={{ fontWeight:700, fontSize:14 }}>{s.이름}</div><div style={{ fontSize:11, color:"#9ca3af" }}>{s.좌석유형} · {s.자리}번</div></div>
+                <div style={{ fontSize:12, color:"#6b7280" }}>{s.층}</div>
+                <div style={{ fontWeight:700, color:"#ef4444", textAlign:"right", fontSize:14 }}>{amt > 0 ? money(amt) : "미확인"}</div>
+                <button onClick={()=>setExcludedUnpaid(prev=>{const ns=new Set(prev);ns.add(s.이름);return ns;})} style={{ background:"#fee2e2", border:"none", borderRadius:8, width:36, height:36, cursor:"pointer", fontSize:16 }}>🗑</button>
+              </div>;
+            })}
+          </div>}
+          {u7.length > 0 && <div>
+            <div style={{ fontWeight:700, fontSize:14, color:"#8b5cf6", marginBottom:8 }}>🏢 7층 ({u7.length}명)</div>
+            {u7.map((s,i) => {
+              const amt = editAmounts[s.이름] !== undefined ? editAmounts[s.이름] : (s.결제금액||0);
+              return <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 80px 130px 44px", gap:10, alignItems:"center", padding:"10px 14px", background:"#fef2f2", borderRadius:10, border:"1px solid #fecaca", marginBottom:6 }}>
+                <div><div style={{ fontWeight:700, fontSize:14 }}>{s.이름}</div><div style={{ fontSize:11, color:"#9ca3af" }}>{s.좌석유형} · {s.자리}번</div></div>
+                <div style={{ fontSize:12, color:"#6b7280" }}>{s.층}</div>
+                <div style={{ fontWeight:700, color:"#ef4444", textAlign:"right", fontSize:14 }}>{amt > 0 ? money(amt) : "미확인"}</div>
+                <button onClick={()=>setExcludedUnpaid(prev=>{const ns=new Set(prev);ns.add(s.이름);return ns;})} style={{ background:"#fee2e2", border:"none", borderRadius:8, width:36, height:36, cursor:"pointer", fontSize:16 }}>🗑</button>
+              </div>;
+            })}
+          </div>}
+          {excludedCount > 0 && <button onClick={()=>setExcludedUnpaid(new Set())} style={{ marginTop:16, padding:"8px 16px", borderRadius:10, border:"1px solid #d1d5db", background:"transparent", color:"#6b7280", fontSize:13, cursor:"pointer" }}>🔄 제외 항목 복원</button>}
         </div>
       </div>
     );
   };
 
   const OnlineModal = () => {
-    const [onlineSearch, setOnlineSearch] = React.useState("");
     if (!showOnlineModal) return null;
     const rows = data.online.filter(o => !excludedOnline.has(o.이름+o.금액));
-    const excluded = data.online.length - data.online.filter(o => !excludedOnline.has(o.이름+o.금액)).length;
+    const excluded = data.online.length - rows.length;
+    const filtered = rows.filter(o => o.이름.includes(onlineSearch));
+    const unpaidList = data.allOff.filter(s => !s.납부여부 && !rows.some(o => normalizeName(o.이름) === normalizeName(s.이름)));
     return (
-      <div onMouseDown={() => setShowOnlineModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-        <div onMouseDown={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+      <div onMouseDown={() => setShowOnlineModal(false)} style={modalStyle.overlay}>
+        <div onMouseDown={e=>e.stopPropagation()} style={modalStyle.box}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
             <div>
               <div style={{ fontWeight:800, fontSize:20 }}>💳 결제선생 상세 내역</div>
               <div style={{ fontSize:13, color:"#6b7280", marginTop:4 }}>총 {rows.length}건 · {excluded>0 && <span style={{color:"#ef4444"}}>제외 {excluded}건 · </span>}합계 {rows.reduce((s,o)=>s+o.금액,0).toLocaleString()}원</div>
             </div>
             <button onClick={()=>setShowOnlineModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
           </div>
-          <input value={onlineSearch} onChange={e => setOnlineSearch(e.target.value)} placeholder="🔍 이름 검색..." style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #6366f1", fontSize:15, marginBottom:16, boxSizing:"border-box", outline:"none" }} />
+          <input value={onlineSearch} onChange={e => setOnlineSearch(e.target.value)} placeholder="🔍 이름 검색..." style={modalStyle.searchInput} />
           <div style={{ display:"grid", gap:8 }}>
-            {rows.filter(o => o.이름.includes(onlineSearch)).map((o,i) => (
+            {filtered.map((o,i) => (
               <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px 110px 44px", gap:12, alignItems:"center", padding:"12px 16px", background:"#eff6ff", borderRadius:12, border:"1px solid #bfdbfe" }}>
                 <div style={{ fontWeight:700, fontSize:15 }}>{o.이름}</div>
                 <div style={{ fontWeight:700, fontSize:15, color:"#3b82f6", textAlign:"right" }}>{o.금액.toLocaleString()}원</div>
@@ -675,47 +680,39 @@ export default function App() {
             ))}
           </div>
           {excluded>0 && <button onClick={()=>setExcludedOnline(new Set())} style={{ marginTop:16, padding:"8px 16px", borderRadius:10, border:"1px solid #d1d5db", background:"transparent", color:"#6b7280", fontSize:13, cursor:"pointer" }}>🔄 제외 항목 복원</button>}
-          {(() => {
-            const paidNames = new Set(rows.map(o => normalizeName(o.이름)));
-            const unpaid = data.allOff.filter(s => !s.납부여부);
-            const notInOnline = unpaid.filter(s => !paidNames.has(normalizeName(s.이름)));
-            if (notInOnline.length === 0) return null;
-            return (
-              <div style={{ marginTop:24 }}>
-                <div style={{ fontWeight:700, color:"#ef4444", fontSize:15, marginBottom:12 }}>⚠️ 결제선생 미포함 학생 ({notInOnline.length}명)</div>
-                <div style={{ display:"grid", gap:6 }}>
-                  {notInOnline.map((s,i) => (
-                    <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 80px 130px", gap:12, alignItems:"center", padding:"10px 14px", background:"#fef2f2", borderRadius:10, border:"1px solid #fecaca", fontSize:14 }}>
-                      <div style={{ fontWeight:700 }}>{s.이름} <span style={{ fontSize:11, color:"#9ca3af" }}>{s.층} · {s.좌석유형}</span></div>
-                      <div style={{ fontSize:12, color:"#9ca3af" }}>{s.전화||""}</div>
-                      <div style={{ fontWeight:700, color:"#ef4444", textAlign:"right" }}>{(payAmountMapRef.current[normalizeName(s.이름)]||0).toLocaleString()}원</div>
-                    </div>
-                  ))}
+          {unpaidList.length > 0 && <div style={{ marginTop:24 }}>
+            <div style={{ fontWeight:700, color:"#ef4444", fontSize:15, marginBottom:12 }}>⚠️ 결제선생 미포함 학생 ({unpaidList.length}명)</div>
+            <div style={{ display:"grid", gap:6 }}>
+              {unpaidList.map((s,i) => (
+                <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px", gap:12, alignItems:"center", padding:"10px 14px", background:"#fef2f2", borderRadius:10, border:"1px solid #fecaca", fontSize:14 }}>
+                  <div style={{ fontWeight:700 }}>{s.이름} <span style={{ fontSize:11, color:"#9ca3af" }}>{s.층} · {s.좌석유형}</span></div>
+                  <div style={{ fontWeight:700, color:"#ef4444", textAlign:"right" }}>{(payAmountMapRef.current[normalizeName(s.이름)]||0).toLocaleString()}원</div>
                 </div>
-              </div>
-            );
-          })()}
+              ))}
+            </div>
+          </div>}
         </div>
       </div>
     );
   };
 
   const ReceiptModal = () => {
-    const [receiptSearch, setReceiptSearch] = React.useState("");
     if (!showReceiptModal) return null;
+    const filtered = receipts.filter(r => r.name.includes(receiptSearch));
+    const unpaidList = data.allOff.filter(s => !s.납부여부 && !receipts.some(r => normalizeName(r.name) === normalizeName(s.이름)));
     return (
-      <div onMouseDown={() => setShowReceiptModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-        <div onMouseDown={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+      <div onMouseDown={() => setShowReceiptModal(false)} style={modalStyle.overlay}>
+        <div onMouseDown={e=>e.stopPropagation()} style={modalStyle.box}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
             <div>
               <div style={{ fontWeight:800, fontSize:20 }}>🧾 영수증앱 상세 내역</div>
               <div style={{ fontSize:13, color:"#6b7280", marginTop:4 }}>총 {receipts.length}건 · 합계 {data.stats.receiptTotal.toLocaleString()}원</div>
             </div>
             <button onClick={()=>setShowReceiptModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
           </div>
-          <input value={receiptSearch} onChange={e => setReceiptSearch(e.target.value)} placeholder="🔍 이름 검색..." style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #6366f1", fontSize:15, marginBottom:16, boxSizing:"border-box", outline:"none" }} />
+          <input value={receiptSearch} onChange={e => setReceiptSearch(e.target.value)} placeholder="🔍 이름 검색..." style={modalStyle.searchInput} />
           <div style={{ display:"grid", gap:8 }}>
-            {receipts.filter(r => r.name.includes(receiptSearch)).map((r,i) => (
+            {filtered.map((r,i) => (
               <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px 110px", gap:12, alignItems:"center", padding:"12px 16px", background:"#fffbeb", borderRadius:12, border:"1px solid #fde68a" }}>
                 <div style={{ fontWeight:700, fontSize:15 }}>{r.name}</div>
                 <div style={{ fontWeight:700, fontSize:15, color:"#f59e0b", textAlign:"right" }}>{Number(r.amount).toLocaleString()}원</div>
@@ -723,72 +720,56 @@ export default function App() {
               </div>
             ))}
           </div>
-          {(() => {
-            const paidNames = new Set(receipts.map(r => normalizeName(r.name)));
-            const unpaid = data.allOff.filter(s => !s.납부여부);
-            const notInReceipt = unpaid.filter(s => !paidNames.has(normalizeName(s.이름)));
-            if (notInReceipt.length === 0) return null;
-            return (
-              <div style={{ marginTop:24 }}>
-                <div style={{ fontWeight:700, color:"#ef4444", fontSize:15, marginBottom:12 }}>⚠️ 영수증 미발행 학생 ({notInReceipt.length}명)</div>
-                <div style={{ display:"grid", gap:6 }}>
-                  {notInReceipt.map((s,i) => (
-                    <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 80px 130px", gap:12, alignItems:"center", padding:"10px 14px", background:"#fef2f2", borderRadius:10, border:"1px solid #fecaca", fontSize:14 }}>
-                      <div style={{ fontWeight:700 }}>{s.이름} <span style={{ fontSize:11, color:"#9ca3af" }}>{s.층} · {s.좌석유형}</span></div>
-                      <div style={{ fontSize:12, color:"#9ca3af" }}>{s.전화||""}</div>
-                      <div style={{ fontWeight:700, color:"#ef4444", textAlign:"right" }}>{(payAmountMapRef.current[normalizeName(s.이름)]||0).toLocaleString()}원</div>
-                    </div>
-                  ))}
+          {unpaidList.length > 0 && <div style={{ marginTop:24 }}>
+            <div style={{ fontWeight:700, color:"#ef4444", fontSize:15, marginBottom:12 }}>⚠️ 영수증 미발행 학생 ({unpaidList.length}명)</div>
+            <div style={{ display:"grid", gap:6 }}>
+              {unpaidList.map((s,i) => (
+                <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px", gap:12, alignItems:"center", padding:"10px 14px", background:"#fef2f2", borderRadius:10, border:"1px solid #fecaca", fontSize:14 }}>
+                  <div style={{ fontWeight:700 }}>{s.이름} <span style={{ fontSize:11, color:"#9ca3af" }}>{s.층} · {s.좌석유형}</span></div>
+                  <div style={{ fontWeight:700, color:"#ef4444", textAlign:"right" }}>{(payAmountMapRef.current[normalizeName(s.이름)]||0).toLocaleString()}원</div>
                 </div>
-              </div>
-            );
-          })()}
+              ))}
+            </div>
+          </div>}
         </div>
       </div>
     );
   };
 
   const BankModal = () => {
-    const [bankSearch, setBankSearch] = React.useState("");
     if (!showBankModal) return null;
-    const rows = (data?.stats?.bankRows || []).filter(r => !excludedBank.has(r.rawName + r.date) && r.rawName.includes(bankSearch));
+    const rows = (data?.stats?.bankRows || []).filter(r => !excludedBank.has(r.rawName + r.date));
     const active = rows.length;
     const total = data?.stats?.bankRows?.length || 0;
     const excluded = total - active;
+    const filtered = rows.filter(r => r.rawName.includes(bankSearch));
     return (
-      <div onMouseDown={() => setShowBankModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-        <div onMouseDown={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: 28, width: "100%", maxWidth: 800, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+      <div onMouseDown={() => setShowBankModal(false)} style={modalStyle.overlay}>
+        <div onMouseDown={e=>e.stopPropagation()} style={modalStyle.box}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
             <div>
-              <div style={{ fontWeight: 800, fontSize: 20 }}>🏦 계좌이체 상세 내역</div>
-              <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
-                총 {active}건 · {excluded > 0 && <span style={{ color: "#ef4444" }}>제외 {excluded}건 · </span>}
-                합계 {rows.reduce((s,r)=>s+r.amount,0).toLocaleString()}원
-              </div>
+              <div style={{ fontWeight:800, fontSize:20 }}>🏦 계좌이체 상세 내역</div>
+              <div style={{ fontSize:13, color:"#6b7280", marginTop:4 }}>총 {active}건 · {excluded > 0 && <span style={{ color:"#ef4444" }}>제외 {excluded}건 · </span>}합계 {rows.reduce((s,r)=>s+r.amount,0).toLocaleString()}원</div>
             </div>
-            <button onClick={() => setShowBankModal(false)} style={{ border: "none", background: "#f3f4f6", borderRadius: 10, width: 36, height: 36, fontSize: 18, cursor: "pointer" }}>✕</button>
+            <button onClick={() => setShowBankModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
           </div>
-          <input value={bankSearch} onChange={e => setBankSearch(e.target.value)} placeholder="🔍 이름 검색..." style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"2px solid #6366f1", fontSize:15, marginBottom:16, boxSizing:"border-box", outline:"none" }} />
-          <div style={{ display: "grid", gap: 8 }}>
-            {rows.map((r, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 130px 110px 44px", gap: 12, alignItems: "center", padding: "12px 16px", background: "#f0fdf4", borderRadius: 12, border: "1px solid #bbf7d0" }}>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>{r.rawName}</div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: "#10b981", textAlign: "right" }}>{r.amount.toLocaleString()}원</div>
-                <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "right" }}>{r.date}</div>
-                <button onClick={() => setExcludedBank(prev => { const s = new Set(prev); s.add(r.rawName + r.date); return s; })}
-                  style={{ background: "#fee2e2", border: "none", borderRadius: 8, width: 36, height: 36, cursor: "pointer", fontSize: 16, color: "#ef4444" }}>🗑</button>
+          <input value={bankSearch} onChange={e => setBankSearch(e.target.value)} placeholder="🔍 이름 검색..." style={modalStyle.searchInput} />
+          <div style={{ display:"grid", gap:8 }}>
+            {filtered.map((r, i) => (
+              <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px 110px 44px", gap:12, alignItems:"center", padding:"12px 16px", background:"#f0fdf4", borderRadius:12, border:"1px solid #bbf7d0" }}>
+                <div style={{ fontWeight:700, fontSize:15 }}>{r.rawName}</div>
+                <div style={{ fontWeight:700, fontSize:15, color:"#10b981", textAlign:"right" }}>{r.amount.toLocaleString()}원</div>
+                <div style={{ fontSize:12, color:"#9ca3af", textAlign:"right" }}>{r.date}</div>
+                <button onClick={() => setExcludedBank(prev => { const s = new Set(prev); s.add(r.rawName + r.date); return s; })} style={{ background:"#fee2e2", border:"none", borderRadius:8, width:36, height:36, cursor:"pointer", fontSize:16, color:"#ef4444" }}>🗑</button>
               </div>
             ))}
           </div>
-          {excluded > 0 && (
-            <button onClick={() => setExcludedBank(new Set())} style={{ marginTop: 16, padding: "8px 16px", borderRadius: 10, border: "1px solid #d1d5db", background: "transparent", color: "#6b7280", fontSize: 13, cursor: "pointer" }}>
-              🔄 제외 항목 복원
-            </button>
-          )}
+          {excluded > 0 && <button onClick={() => setExcludedBank(new Set())} style={{ marginTop:16, padding:"8px 16px", borderRadius:10, border:"1px solid #d1d5db", background:"transparent", color:"#6b7280", fontSize:13, cursor:"pointer" }}>🔄 제외 항목 복원</button>}
         </div>
       </div>
     );
   };
+
 
   if (!data) {
     return (
