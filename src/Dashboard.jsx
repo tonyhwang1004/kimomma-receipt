@@ -259,7 +259,6 @@ export default function App() {
   const [searchReceipt, setSearchReceipt] = useState("");
   const [searchBank, setSearchBank] = useState("");
   const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [showScholarModal, setShowScholarModal] = useState(false);
   const [excludedOnline, setExcludedOnline] = useState(new Set());
   const bankRef = useRef([]);
 
@@ -621,8 +620,8 @@ export default function App() {
       );
     };
     return (
-      <div onClick={() => setShowUnpaidModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
+      <div onMouseDown={() => setShowUnpaidModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+        <div onMouseDown={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
             <div>
               <div style={{ fontWeight:800, fontSize:20 }}>⚠️ 미납 학생 현황</div>
@@ -657,8 +656,8 @@ export default function App() {
     const rows = data.online.filter(o => !excludedOnline.has(o.이름+o.금액) && o.이름.includes(searchOnline));
     const excluded = data.online.length - data.online.filter(o => !excludedOnline.has(o.이름+o.금액)).length;
     return (
-      <div onClick={() => setShowOnlineModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
+      <div onMouseDown={() => setShowOnlineModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+        <div onMouseDown={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
             <div>
               <div style={{ fontWeight:800, fontSize:20 }}>💳 결제선생 상세 내역</div>
@@ -706,8 +705,8 @@ export default function App() {
   const ReceiptModal = () => {
     if (!showReceiptModal) return null;
     return (
-      <div onClick={() => setShowReceiptModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
+      <div onMouseDown={() => setShowReceiptModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+        <div onMouseDown={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
             <div>
               <div style={{ fontWeight:800, fontSize:20 }}>🧾 영수증앱 상세 내역</div>
@@ -750,31 +749,6 @@ export default function App() {
     );
   };
 
-  const ScholarModal = () => {
-    if (!showScholarModal) return null;
-    return (
-      <div onClick={() => setShowScholarModal(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:800, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
-            <div>
-              <div style={{ fontWeight:800, fontSize:20 }}>🎓 장학생 납부 내역</div>
-              <div style={{ fontSize:13, color:"#6b7280", marginTop:4 }}>{scholarCount}명 · 현금결제 90% 적용 · 합계 {data.stats.scholarPaid.toLocaleString()}원</div>
-            </div>
-            <button onClick={()=>setShowScholarModal(false)} style={{ border:"none", background:"#f3f4f6", borderRadius:10, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
-          </div>
-          <div style={{ display:"grid", gap:8 }}>
-            {scholarList.map((name,i) => (
-              <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 130px", gap:12, alignItems:"center", padding:"12px 16px", background:"#fffbeb", borderRadius:12, border:"1px solid #fde68a" }}>
-                <div style={{ fontWeight:700, fontSize:15 }}>🎓 {name}</div>
-                <div style={{ fontWeight:700, fontSize:15, color:"#f59e0b", textAlign:"right" }}>{scholarAmountsRef.current?.[name] ? (Math.round(scholarAmountsRef.current[name]*0.9)).toLocaleString()+"원" : "-"}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   const SearchBox = ({ value, onChange }) => (
     <input
       value={value}
@@ -791,8 +765,8 @@ export default function App() {
     const total = data?.stats?.bankRows?.length || 0;
     const excluded = total - active;
     return (
-      <div onClick={() => setShowBankModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-        <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: 28, width: "100%", maxWidth: 800, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+      <div onMouseDown={() => setShowBankModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+        <div onMouseDown={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: 28, width: "100%", maxWidth: 800, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: 20 }}>🏦 계좌이체 상세 내역</div>
@@ -888,7 +862,6 @@ export default function App() {
     <UnpaidModal />
     <OnlineModal />
     <ReceiptModal />
-    <ScholarModal />
     <BankModal />
     <div style={{ minHeight: "100dvh", background: C.bg, fontFamily: "'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif", color: C.text }}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -940,9 +913,7 @@ export default function App() {
               <div onClick={() => setShowReceiptModal(true)} style={{ cursor: "pointer" }}>
                 <StatCard icon="🧾" label="영수증앱 (오프라인)" value={money(data.stats.receiptTotal)} sub={`${receipts.length}건 · 클릭해서 상세보기`} color={C.warning} glow />
               </div>
-              <div onClick={() => setShowScholarModal(true)} style={{ cursor: "pointer" }}>
-                <StatCard icon="🎓" label="장학생 납부 (현금·90%)" value={money(data.stats.scholarPaid)} sub={`${scholarCount}명 · 클릭해서 상세보기`} color="#f59e0b" glow />
-              </div>
+
               {data.stats.bankCnt > 0 && (() => {
                 const activeBankRows = (data.stats.bankRows||[]).filter(r => !excludedBank.has(r.rawName + r.date));
                 const activeTotal = activeBankRows.reduce((s,r)=>s+r.amount,0);
