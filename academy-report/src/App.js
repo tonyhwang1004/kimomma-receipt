@@ -47,18 +47,20 @@ function printHtml(html, title) {
   const win = window.open("", "_blank");
   win.document.write(`<!DOCTYPE html><html><head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap');
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #1e1b4b; padding: 24px; }
+      body { font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #1e1b4b; padding: 20px 40px; max-width: 780px; margin: 0 auto; }
       @media print {
-        body { padding: 12px; }
+        body { padding: 0; max-width: 100%; }
         .no-print { display: none !important; }
-        @page { size: A4; margin: 15mm; }
+        @page { size: A4 portrait; margin: 12mm 15mm; }
+        div { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       }
       .print-btn {
-        display: block; margin: 0 auto 20px;
+        display: block; margin: 0 auto 24px;
         padding: 12px 32px; background: #6366f1; color: #fff;
         border: none; border-radius: 10px; font-size: 15px;
         font-weight: 700; cursor: pointer; font-family: 'Noto Sans KR', sans-serif;
