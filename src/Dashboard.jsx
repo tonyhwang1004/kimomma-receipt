@@ -634,7 +634,47 @@ export default function App() {
     setTab("summary");
   }, []);
 
+  // 결제선생 데이터를 Supabase card_payments 테이블에 자동 저장
+  const saveCardPaymentsToSupabase = async (wb) => {
+    try {
+      const SUPABASE_URL = "https://jcwveyvqdjqxpznsfmpz.supabase.co";
+      const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impjd3ZleXZxZGpxeHB6bnNmbXB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MTMxODcsImV4cCI6MjA4ODE4OTE4N30.PjgghG0rWM73RdTTG9f5gsh1S8FA9y7GWByehux1JMM";
+      const sheetName = wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      if (!ws) return;
+      const XLSX_LIB = window.XLSX || globalThis.XLSX;
+      if (!XLSX_LIB) return;
+      const rows = XLSX_LIB.utils.sheet_to_json(ws, { defval: "" });
+      const cardData = rows.map(r => {
+        const name = r["이름"] || r["고객명"] || r["성명"] || r["학생명"] || r["결제자"] || "";
+        const amount = Number(String(r["금액"] || r["결제금액"] || r["승인금액"] || r["실결제금액"] || 0).replace(/[^0-9]/g, "")) || 0;
+        const date = r["결제일"] || r["승인일자"] || r["일자"] || r["날짜"] || "";
+        const memo = r["메모"] || r["적요"] || r["내역"] || "";
+        return { name: String(name).trim(), amount, date: String(date), memo: String(memo) };
+      }).filter(r => r.name && r.amount > 0);
+      if (cardData.length === 0) return;
+      await fetch(`${SUPABASE_URL}/rest/v1/card_payments?id=gt.0`, {
+        method: "DELETE",
+        headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` },
+      });
+      await fetch(`${SUPABASE_URL}/rest/v1/card_payments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_KEY,
+          "Authorization": `Bearer ${SUPABASE_KEY}`,
+          "Prefer": "return=minimal",
+        },
+        body: JSON.stringify(cardData),
+      });
+      console.log(`✅ 결제선생 ${cardData.length}건 Supabase 저장 완료`);
+    } catch (err) {
+      console.error("❌ 결제선생 Supabase 저장 실패:", err);
+    }
+  };
+
   const handleOnline = (wb) => {
+    saveCardPaymentsToSupabase(wb);
     onlineRef.current = wb;
     setOnlineWb(wb);
     // 계좌이체도 올라와 있을 때만 대시보드로 넘어감
