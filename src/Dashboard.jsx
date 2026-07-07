@@ -906,9 +906,11 @@ export default function App() {
             <div style={{ background: C.surface, borderRadius: 16, padding: "16px 20px", border: `2px solid ${C.primary}`, marginBottom: 20 }}>
               <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>✅ 정확한 전체 수납 합계 (결제선생 + 영수증앱 + 장학생 + 계좌이체)</div>
               <div style={{ fontSize: 32, fontWeight: 800, color: C.primary, letterSpacing: -1 }}>{money(
-                data.online.filter(o=>!excludedOnline.has(o.이름+o.금액)).reduce((s,o)=>s+o.금액,0) + data.stats.receiptTotal + data.stats.scholarPaid +
-                }).filter(r => r.name && r.amount > 0);
-              )}</div>
+  data.online.filter(o=>!excludedOnline.has(o.이름+o.금액)).reduce((s,o)=>s+o.금액,0) +
+  data.stats.receiptTotal +
+  data.stats.scholarPaid +
+  (data.stats.bankRows||[]).filter(r=>!excludedBank.has(r.rawName+r.date)).reduce((s,r)=>s+r.amount,0)
+)}</div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 28 }}>
