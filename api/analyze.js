@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
   try {
     console.log("Anthropic API 호출 시작...");
-    console.log("모델: claude-sonnet-4-20250514");
+    console.log("모델: claude-sonnet-4-5");
     console.log("이미지 타입:", mediaType);
     console.log("이미지 크기:", Math.round(image.length / 1024), "KB (base64)");
 
