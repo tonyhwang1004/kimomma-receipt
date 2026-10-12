@@ -223,6 +223,18 @@ export default function App() {
   if (view === "confirm" || manualMode) {
     const data = preview || { name: "", amount: 0, date: todayStr(), memo: "" };
     const put = (patch) => setPreview({ ...data, ...patch });
+
+    /* 같은 영수증을 두 번 찍는 일이 잦아서 저장 전에 알려줍니다. (2026-10-12)
+       이름+금액+날짜가 모두 같으면 같은 건으로 보고 빨갛게,
+       날짜만 다르면 분할 결제일 수도 있어 주황으로 알리고 저장은 막지 않습니다. */
+    const dName = String(data.name || "").trim();
+    const dAmount = Number(data.amount) || 0;
+    const dDate = String(data.date || "").slice(0, 10);
+    const sameName = (dName && dAmount > 0)
+      ? records.filter((r) => String(r.name || "").trim() === dName && Number(r.amount) === dAmount)
+      : [];
+    const dupExact = sameName.find((r) => String(r.date || "").slice(0, 10) === dDate) || null;
+    const dupOther = !dupExact ? (sameName[0] || null) : null;
     /* 이름을 고르면 지난번 금액·메모까지 같이 채웁니다.
        이미 손으로 넣은 값은 덮어쓰지 않습니다. */
     const pickName = (n) => {
@@ -277,9 +289,29 @@ export default function App() {
           <div style={{ background: C.card, borderRadius: 20, padding: 28, boxShadow: "0 2px 20px rgba(0,0,0,0.06)", border: `1px solid ${C.border}` }}>
             <div style={{ textAlign: "center", marginBottom: 24 }}>
               <div style={{ fontSize: 48, marginBottom: 8 }}>{manualMode && !preview ? "✏️" : "🧾"}</div>
-              {!manualMode && (
+              {!manualMode && !dupExact && !dupOther && (
                 <div style={{ fontSize: 14, color: C.success, fontWeight: 600, background: C.successLight, display: "inline-block", padding: "4px 14px", borderRadius: 20 }}>
                   ✓ 인식 완료
+                </div>
+              )}
+              {dupExact && (
+                <div style={{ background: C.dangerLight, border: `1.5px solid ${C.danger}`, borderRadius: 14, padding: "14px 16px", textAlign: "left", marginTop: 4 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: C.danger, marginBottom: 4 }}>⚠️ 이미 등록된 영수증입니다</div>
+                  <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>
+                    {dupExact.date} · {dupExact.name} · {money(dupExact.amount)}
+                    {dupExact.memo ? ` · ${dupExact.memo}` : ""}
+                    <br />같은 영수증을 두 번 찍으신 것 같습니다. 그래도 저장하시려면 아래에서 한 번 더 확인합니다.
+                  </div>
+                </div>
+              )}
+              {dupOther && (
+                <div style={{ background: "#FDF3E0", border: "1.5px solid #C98A2E", borderRadius: 14, padding: "14px 16px", textAlign: "left", marginTop: 4 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#C98A2E", marginBottom: 4 }}>같은 금액이 이미 있습니다</div>
+                  <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>
+                    {dupOther.date} · {dupOther.name} · {money(dupOther.amount)}
+                    {dupOther.memo ? ` · ${dupOther.memo}` : ""}
+                    <br />날짜가 다릅니다. 나눠 내신 것이면 그대로 저장하세요.
+                  </div>
                 </div>
               )}
             </div>
@@ -314,9 +346,12 @@ export default function App() {
             <div style={{ display: "flex", gap: 12, marginTop: 28 }}>
               <button onClick={() => { setPreview(null); setManualMode(false); setView("home"); }}
                 style={{ flex: 1, padding: "14px", borderRadius: 14, border: `1.5px solid ${C.border}`, background: C.card, fontSize: 15, fontWeight: 600, color: C.textLight, cursor: "pointer", fontFamily: "inherit" }}>취소</button>
-              <button onClick={confirmSave}
-                style={{ flex: 2, padding: "14px", borderRadius: 14, border: "none", background: `linear-gradient(135deg, ${C.primary}, ${C.primaryDark})`, fontSize: 15, fontWeight: 600, color: "#fff", cursor: "pointer", fontFamily: "inherit", boxShadow: `0 4px 14px ${C.primary}55`, opacity: (!preview || !preview.name) ? 0.5 : 1 }}
-                disabled={!preview || !preview.name}>✓ 저장하기</button>
+              <button onClick={() => {
+                  if (dupExact && !window.confirm(`이미 등록된 영수증입니다.\n\n${dupExact.date} · ${dupExact.name} · ${money(dupExact.amount)}\n\n그래도 저장할까요?`)) return;
+                  confirmSave();
+                }}
+                style={{ flex: 2, padding: "14px", borderRadius: 14, border: "none", background: dupExact ? C.danger : `linear-gradient(135deg, ${C.primary}, ${C.primaryDark})`, fontSize: 15, fontWeight: 600, color: "#fff", cursor: "pointer", fontFamily: "inherit", boxShadow: `0 4px 14px ${dupExact ? C.danger : C.primary}55`, opacity: (!preview || !preview.name) ? 0.5 : 1 }}
+                disabled={!preview || !preview.name}>{dupExact ? "중복인데 저장하기" : "✓ 저장하기"}</button>
             </div>
           </div>
         </div>
