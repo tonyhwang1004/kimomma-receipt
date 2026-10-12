@@ -32,6 +32,19 @@ const C = {
 };
 
 const money = (n) => Number(n).toLocaleString("ko-KR") + "원";
+
+/* 한글 초성 뽑기. 「ㄱㅇㅈ」만 쳐도 「김은지」가 걸리게 하려고 씁니다.
+   손글씨 이름을 보고 전부 치는 것보다 훨씬 빠릅니다. (2026-10-12) */
+const CHO = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+const chosung = (t) => [...String(t)].map((ch) => {
+  const code = ch.charCodeAt(0) - 0xac00;
+  return code >= 0 && code <= 11171 ? CHO[Math.floor(code / 588)] : ch;
+}).join("");
+const nameMatches = (name, q) => {
+  const t = String(q).trim();
+  if (!t) return false;
+  return name.includes(t) || chosung(name).includes(t);
+};
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 function Header({ title, onBack }) {
@@ -170,6 +183,17 @@ export default function App() {
   }).sort((a, b) => b.total - a.total);
   const filtered = filterName ? records.filter((r) => r.name === filterName) : records;
 
+  /* 입력 도우미용 목록. records 가 created_at 내림차순이라 그대로 쓰면 최근 순입니다. */
+  const recentNames = [];
+  records.forEach((r) => { if (r.name && !recentNames.includes(r.name)) recentNames.push(r.name); });
+  /* 이름별 마지막 영수증. 이름을 고르면 지난번 금액·메모를 그대로 채워 줍니다. */
+  const lastByName = {};
+  records.forEach((r) => { if (r.name && !lastByName[r.name]) lastByName[r.name] = r; });
+  /* 자주 쓴 메모 5개 */
+  const memoCount = {};
+  records.forEach((r) => { const m = String(r.memo || "").trim(); if (m) memoCount[m] = (memoCount[m] || 0) + 1; });
+  const topMemos = Object.keys(memoCount).sort((a, b) => memoCount[b] - memoCount[a]).slice(0, 5);
+
   // ─── 스피너 ───
   if (loading) {
     return (
@@ -190,6 +214,53 @@ export default function App() {
   // ─── 확인 / 수동입력 ───
   if (view === "confirm" || manualMode) {
     const data = preview || { name: "", amount: 0, date: todayStr(), memo: "" };
+    const put = (patch) => setPreview({ ...data, ...patch });
+    /* 이름을 고르면 지난번 금액·메모까지 같이 채웁니다.
+       이미 손으로 넣은 값은 덮어쓰지 않습니다. */
+    const pickName = (n) => {
+      const last = lastByName[n] || {};
+      put({
+        name: n,
+        amount: Number(data.amount) > 0 ? data.amount : (Number(last.amount) || 0),
+        memo: String(data.memo || "").trim() ? data.memo : (last.memo || ""),
+      });
+    };
+    /* 칸 아래에 띄울 추천 목록. 이름은 최근 순·초성 검색,
+       금액은 그 금액을 냈던 사람 역추적, 메모는 자주 쓰는 것. */
+    const suggestFor = (key) => {
+      let items = [], onPick = () => {}, hint = "";
+      const typedName = String(data.name || "").trim();
+      if (key === "name") {
+        items = (typedName ? recentNames.filter((n) => n !== typedName && nameMatches(n, typedName)) : recentNames).slice(0, 8);
+        onPick = pickName;
+        hint = typedName ? "" : "최근 입력";
+      } else if (key === "amount") {
+        const amt = Number(data.amount) || 0;
+        if (amt > 0 && !typedName) {
+          items = recentNames.filter((n) => records.some((r) => r.name === n && Number(r.amount) === amt)).slice(0, 8);
+          onPick = pickName;
+          hint = "이 금액을 냈던 사람";
+        }
+      } else if (key === "memo") {
+        if (!String(data.memo || "").trim()) { items = topMemos; onPick = (m) => put({ memo: m }); hint = "자주 쓰는 메모"; }
+      }
+      if (!items.length) return null;
+      return (
+        <div style={{ marginTop: 8 }}>
+          {hint && <div style={{ fontSize: 11, color: C.textLight, marginBottom: 6 }}>{hint}</div>}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {items.map((it) => (
+              <button key={it} type="button" onClick={() => onPick(it)} style={{
+                padding: "7px 12px", borderRadius: 16, border: `1px solid ${C.border}`,
+                background: C.card, color: C.text, fontSize: 13, fontWeight: 500,
+                cursor: "pointer", fontFamily: "inherit", maxWidth: "100%",
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>{it}</button>
+            ))}
+          </div>
+        </div>
+      );
+    };
     return (
       <div style={{ minHeight: "100dvh", background: C.bg, fontFamily: "'Noto Sans KR', sans-serif" }}>
         <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -229,6 +300,7 @@ export default function App() {
                   onFocus={(e) => e.target.style.borderColor = C.primary}
                   onBlur={(e) => e.target.style.borderColor = C.border}
                 />
+                {suggestFor(key)}
               </div>
             ))}
             <div style={{ display: "flex", gap: 12, marginTop: 28 }}>
