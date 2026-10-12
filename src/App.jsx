@@ -20,6 +20,14 @@ const sbFetch = async (method, path, body) => {
 };
 
 const getReceipts = () => sbFetch("GET", "/receipts?select=*&order=created_at.desc");
+
+/* 이 날짜(포함)부터의 영수증만 화면에 올립니다. 그 전 자료는 Supabase 에 그대로
+   남아 있고 보여주기만 하지 않습니다. 구글시트 백업도 같은 기준입니다.
+   기준을 바꾸거나 전부 다시 보려면 이 한 줄만 고치면 됩니다. (2026-10-12) */
+const CUTOFF = "2026-09-25";
+/* date 가 비어 있으면 created_at 으로 대신합니다. 백업 스크립트와 같은 기준입니다. */
+const receiptDate = (r) => String(r?.date || r?.created_at || "").slice(0, 10);
+const afterCutoff = (r) => { const d = receiptDate(r); return d.length === 10 && d >= CUTOFF; };
 const addReceipt = (r) => sbFetch("POST", "/receipts", r);
 const deleteReceipt = (id) => sbFetch("DELETE", `/receipts?id=eq.${id}`);
 
@@ -94,7 +102,7 @@ export default function App() {
     setSyncing(true);
     try {
       const data = await getReceipts();
-      setRecords(data || []);
+      setRecords((data || []).filter(afterCutoff));
     } catch (e) {
       setError("데이터 로드 실패: " + e.message);
     }
